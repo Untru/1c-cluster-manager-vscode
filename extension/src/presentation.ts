@@ -44,7 +44,7 @@ export function recordLabel(resource: ResourceType, record: RacRecord): string {
 
 export function recordDescription(resource: ResourceType, record: RacRecord): string {
   switch (resource) {
-    case "infobases": return record.descr || record.infobase || "";
+    case "infobases": return record.descr || "";
     case "sessions": return record["started-at"] || record.session || "";
     case "connections": return record["connected-at"] || record.connection || "";
     case "locks": return record.session || record.connection || "";
@@ -54,4 +54,3 @@ export function recordDescription(resource: ResourceType, record: RacRecord): st
     case "services": return record.manager || "";
   }
 }
-
