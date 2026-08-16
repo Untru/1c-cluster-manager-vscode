@@ -1,0 +1,13 @@
+{
+  "servers": {
+    "onec-cluster-manager": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["${workspaceFolder}/mcp/out/index.js"],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "ONEC_CLUSTER_MANAGER_BACKEND_URL": "http://127.0.0.1:32145"
+      }
+    }
+  }
+}

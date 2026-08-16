@@ -6,3 +6,4 @@ extension/backend/
 .onec-cluster-manager/
 coverage/
 *.log
+.vscode-test/

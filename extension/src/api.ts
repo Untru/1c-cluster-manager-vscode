@@ -3,10 +3,16 @@ import type { BackendConnection, Credentials, RacResponse, ResourceType } from "
 import { SecretRepository } from "./secrets";
 
 export class BackendError extends Error {
-  public constructor(public readonly status: number, message: string) {
+  public constructor(
+    public readonly status: number,
+    message: string,
+    public readonly details?: { code?: string },
+  ) {
     super(message);
   }
 }
+
+type AuthorizationScope = "cluster" | "infobase";
 
 export class ApiClient {
   public constructor(private readonly secrets: SecretRepository) {}
@@ -34,9 +40,27 @@ export class ApiClient {
   }
 
   public async resources(connectionId: string, clusterId: string, resource: ResourceType): Promise<RacResponse> {
-    return this.request(`/api/connections/${connectionId}/clusters/${clusterId}/${resource}`, {
-      credentials: await this.credentials(connectionId, clusterId),
-    });
+    return this.authorized(connectionId, clusterId, "cluster", undefined, (credentials) =>
+      this.request(`/api/connections/${connectionId}/clusters/${clusterId}/${resource}`, { credentials }));
+  }
+
+  public async infobaseDetails(connectionId: string, clusterId: string, infobaseId: string): Promise<RacResponse> {
+    return this.authorized(connectionId, clusterId, "infobase", infobaseId, (credentials) =>
+      this.request(`/api/connections/${connectionId}/clusters/${clusterId}/infobases/${infobaseId}`, { credentials }));
+  }
+
+  public async createInfobase(connectionId: string, clusterId: string, body: Record<string, unknown>): Promise<RacResponse> {
+    return this.authorized(connectionId, clusterId, "cluster", undefined, (credentials) =>
+      this.request(`/api/connections/${connectionId}/clusters/${clusterId}/infobases`, {
+        method: "POST", body, credentials,
+      }));
+  }
+
+  public async removeInfobase(connectionId: string, clusterId: string, infobaseId: string): Promise<void> {
+    await this.authorized(connectionId, clusterId, "infobase", infobaseId, (credentials) =>
+      this.request(`/api/connections/${connectionId}/clusters/${clusterId}/infobases/${infobaseId}`, {
+        method: "DELETE", credentials,
+      }));
   }
 
   public async action(
@@ -48,11 +72,57 @@ export class ApiClient {
     body: Record<string, unknown> = {},
     infobaseId?: string,
   ): Promise<RacResponse> {
-    return this.request(`/api/connections/${connectionId}/clusters/${clusterId}/${resource}/${targetId}/${action}`, {
-      method: "POST",
-      body,
-      credentials: await this.credentials(connectionId, clusterId, infobaseId),
+    const scope: AuthorizationScope = (resource === "infobases" || resource === "connections") && infobaseId
+      ? "infobase"
+      : "cluster";
+    return this.authorized(connectionId, clusterId, scope, infobaseId, (credentials) =>
+      this.request(`/api/connections/${connectionId}/clusters/${clusterId}/${resource}/${targetId}/${action}`, {
+        method: "POST", body, credentials,
+      }));
+  }
+
+  private async authorized<T>(
+    connectionId: string,
+    clusterId: string,
+    scope: AuthorizationScope,
+    infobaseId: string | undefined,
+    operation: (credentials: { cluster: Credentials; infobase: Credentials }) => Promise<T>,
+  ): Promise<T> {
+    try {
+      return await operation(await this.credentials(connectionId, clusterId, infobaseId));
+    } catch (error) {
+      if (!(error instanceof BackendError) || error.details?.code !== "RAC_AUTH_REQUIRED") throw error;
+      const saved = scope === "infobase" && infobaseId
+        ? await this.secrets.getInfobase(connectionId, clusterId, infobaseId)
+        : await this.secrets.getCluster(connectionId, clusterId);
+      const credentials = await this.promptCredentials(scope, saved.user);
+      if (!credentials) throw new BackendError(401, "Ввод учётных данных отменён");
+      if (scope === "infobase" && infobaseId) {
+        await this.secrets.setInfobase(connectionId, clusterId, infobaseId, credentials);
+      } else {
+        await this.secrets.setCluster(connectionId, clusterId, credentials);
+      }
+      return operation(await this.credentials(connectionId, clusterId, infobaseId));
+    }
+  }
+
+  private async promptCredentials(scope: AuthorizationScope, currentUser?: string): Promise<Credentials | undefined> {
+    const owner = scope === "infobase" ? "информационной базы" : "кластера";
+    const user = await vscode.window.showInputBox({
+      title: `Требуется авторизация администратора ${owner}`,
+      prompt: "Логин",
+      value: currentUser,
+      ignoreFocusOut: true,
+      validateInput: (value) => value.trim() ? undefined : "Введите логин",
     });
+    if (user === undefined) return undefined;
+    const password = await vscode.window.showInputBox({
+      title: `Требуется авторизация администратора ${owner}`,
+      prompt: "Пароль",
+      password: true,
+      ignoreFocusOut: true,
+    });
+    return password === undefined ? undefined : { user: user.trim(), password };
   }
 
   private async credentials(connectionId: string, clusterId: string, infobaseId?: string): Promise<{ cluster: Credentials; infobase: Credentials }> {
@@ -88,8 +158,8 @@ export class ApiClient {
       signal: AbortSignal.timeout(35_000),
     });
     if (response.status === 204) return undefined as T;
-    const payload = await response.json() as { error?: string } & T;
-    if (!response.ok) throw new BackendError(response.status, payload.error ?? `Backend returned HTTP ${response.status}`);
+    const payload = await response.json() as { error?: string; details?: { code?: string } } & T;
+    if (!response.ok) throw new BackendError(response.status, payload.error ?? `Backend returned HTTP ${response.status}`, payload.details);
     return payload;
   }
 }

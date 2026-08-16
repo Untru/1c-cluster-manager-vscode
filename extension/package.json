@@ -17,7 +17,7 @@
     "onCommand:onecClusterManager.addConnection"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json && node scripts/copy-backend.js",
+    "build": "node ../scripts/clean-out.js && tsc -p tsconfig.json && node scripts/copy-backend.js",
     "test": "npm run build && node --test out/**/*.test.js",
     "package": "npx @vscode/vsce package --no-dependencies --allow-missing-repository"
   },
@@ -35,6 +35,8 @@
       { "command": "onecClusterManager.setInfobaseCredentials", "title": "1C: Указать администратора информационной базы", "icon": "$(key)" },
       { "command": "onecClusterManager.setBackendToken", "title": "1C: Указать токен backend" },
       { "command": "onecClusterManager.openDetails", "title": "1C: Показать подробности" },
+      { "command": "onecClusterManager.openSessions", "title": "1C: Открыть список сеансов", "icon": "$(table)" },
+      { "command": "onecClusterManager.openLocks", "title": "1C: Открыть таблицу блокировок", "icon": "$(table)" },
       { "command": "onecClusterManager.terminateSession", "title": "1C: Завершить сеанс" },
       { "command": "onecClusterManager.interruptSession", "title": "1C: Прервать серверный вызов" },
       { "command": "onecClusterManager.disconnectConnection", "title": "1C: Разорвать соединение" },
@@ -42,7 +44,11 @@
       { "command": "onecClusterManager.enableSessionLock", "title": "1C: Заблокировать начало сеансов" },
       { "command": "onecClusterManager.disableSessionLock", "title": "1C: Разрешить начало сеансов" },
       { "command": "onecClusterManager.enableScheduledJobsLock", "title": "1C: Заблокировать регламентные задания" },
-      { "command": "onecClusterManager.disableScheduledJobsLock", "title": "1C: Разрешить регламентные задания" }
+      { "command": "onecClusterManager.disableScheduledJobsLock", "title": "1C: Разрешить регламентные задания" },
+      { "command": "onecClusterManager.createInfobase", "title": "1C: Зарегистрировать информационную базу", "icon": "$(database)" },
+      { "command": "onecClusterManager.removeInfobase", "title": "1C: Удалить регистрацию информационной базы", "icon": "$(trash)" },
+      { "command": "onecClusterManager.denyLicenseDistribution", "title": "1C: Запретить выдачу лицензий" },
+      { "command": "onecClusterManager.allowLicenseDistribution", "title": "1C: Разрешить выдачу лицензий" }
     ],
     "viewsContainers": {
       "activitybar": [
@@ -69,6 +75,8 @@
         { "command": "onecClusterManager.removeConnection", "when": "view == onecClusters && viewItem == connection", "group": "inline" },
         { "command": "onecClusterManager.setClusterCredentials", "when": "view == onecClusters && viewItem == cluster", "group": "1_auth" },
         { "command": "onecClusterManager.setInfobaseCredentials", "when": "view == onecClusters && viewItem == infobase", "group": "1_auth" },
+        { "command": "onecClusterManager.openSessions", "when": "view == onecClusters && viewItem == resource.sessions", "group": "inline" },
+        { "command": "onecClusterManager.openLocks", "when": "view == onecClusters && viewItem == resource.locks", "group": "inline" },
         { "command": "onecClusterManager.terminateSession", "when": "view == onecClusters && viewItem == session", "group": "2_manage" },
         { "command": "onecClusterManager.interruptSession", "when": "view == onecClusters && viewItem == session", "group": "2_manage" },
         { "command": "onecClusterManager.disconnectConnection", "when": "view == onecClusters && viewItem == racConnection", "group": "2_manage" },
@@ -76,7 +84,11 @@
         { "command": "onecClusterManager.enableSessionLock", "when": "view == onecClusters && viewItem == infobase", "group": "3_locks" },
         { "command": "onecClusterManager.disableSessionLock", "when": "view == onecClusters && viewItem == infobase", "group": "3_locks" },
         { "command": "onecClusterManager.enableScheduledJobsLock", "when": "view == onecClusters && viewItem == infobase", "group": "3_locks" },
-        { "command": "onecClusterManager.disableScheduledJobsLock", "when": "view == onecClusters && viewItem == infobase", "group": "3_locks" }
+        { "command": "onecClusterManager.disableScheduledJobsLock", "when": "view == onecClusters && viewItem == infobase", "group": "3_locks" },
+        { "command": "onecClusterManager.createInfobase", "when": "view == onecClusters && viewItem == resource.infobases", "group": "1_manage" },
+        { "command": "onecClusterManager.removeInfobase", "when": "view == onecClusters && viewItem == infobase", "group": "4_danger" },
+        { "command": "onecClusterManager.denyLicenseDistribution", "when": "view == onecClusters && viewItem == infobase", "group": "3_locks" },
+        { "command": "onecClusterManager.allowLicenseDistribution", "when": "view == onecClusters && viewItem == infobase", "group": "3_locks" }
       ]
     },
     "configuration": {

@@ -75,8 +75,16 @@ export class ClusterTreeProvider implements vscode.TreeDataProvider<ClusterNode>
     if (element.kind === "cluster") {
       return RESOURCE_TYPES.map((resource) => {
         const node = new ClusterNode("resource", resourceLabel(resource), vscode.TreeItemCollapsibleState.Collapsed, element.connectionId, element.clusterId, resource);
-        node.contextValue = "resource";
+        node.contextValue = `resource.${resource}`;
         node.iconPath = new vscode.ThemeIcon(RESOURCE_ICONS[resource]);
+        if (resource === "sessions") {
+          node.command = { command: "onecClusterManager.openSessions", title: "Открыть список сеансов", arguments: [node] };
+          node.tooltip = "Открыть табличный список сеансов; стрелка слева разворачивает дерево";
+        }
+        if (resource === "locks") {
+          node.command = { command: "onecClusterManager.openLocks", title: "Открыть таблицу блокировок", arguments: [node] };
+          node.tooltip = "Открыть таблицу блокировок; стрелка слева разворачивает дерево";
+        }
         return node;
       });
     }
