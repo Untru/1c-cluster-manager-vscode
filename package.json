@@ -1,0 +1,21 @@
+{
+  "name": "pusk-vscode",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "extension"
+  ],
+  "scripts": {
+    "build": "npm run build --workspace @pusk/backend && npm run build --workspace pusk-cluster-manager",
+    "test": "npm run test --workspace @pusk/backend && npm run test --workspace pusk-cluster-manager",
+    "check": "npm run build && npm test"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
+

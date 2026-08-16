@@ -1,0 +1,17 @@
+{
+  "name": "@pusk/backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "main": "out/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node out/index.js",
+    "dev": "node --watch out/index.js",
+    "test": "npm run build && node --test out/**/*.test.js"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0"
+  }
+}
+

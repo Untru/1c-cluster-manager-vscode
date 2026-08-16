@@ -1,0 +1,8 @@
+node_modules/
+out/
+dist/
+extension/backend/
+*.vsix
+.pusk/
+coverage/
+*.log

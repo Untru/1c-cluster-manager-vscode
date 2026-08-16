@@ -1,0 +1,106 @@
+{
+  "name": "pusk-cluster-manager",
+  "displayName": "1C Cluster Manager",
+  "description": "Управление кластерами 1С:Предприятия через RAS/rac из VS Code",
+  "version": "0.1.0",
+  "publisher": "local",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.96.0"
+  },
+  "extensionKind": ["ui"],
+  "categories": ["Other"],
+  "keywords": ["1c", "1с", "ras", "rac", "cluster"],
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onView:puskClusters",
+    "onCommand:pusk.addConnection"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/copy-backend.js",
+    "test": "npm run build && node --test out/**/*.test.js",
+    "package": "npx @vscode/vsce package --no-dependencies --allow-missing-repository"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "@types/vscode": "^1.96.0",
+    "@vscode/vsce": "^3.6.0"
+  },
+  "contributes": {
+    "commands": [
+      { "command": "pusk.refresh", "title": "1C: Обновить дерево", "icon": "$(refresh)" },
+      { "command": "pusk.addConnection", "title": "1C: Добавить подключение RAS", "icon": "$(add)" },
+      { "command": "pusk.removeConnection", "title": "1C: Удалить подключение", "icon": "$(trash)" },
+      { "command": "pusk.setClusterCredentials", "title": "1C: Указать администратора кластера", "icon": "$(key)" },
+      { "command": "pusk.setInfobaseCredentials", "title": "1C: Указать администратора информационной базы", "icon": "$(key)" },
+      { "command": "pusk.setBackendToken", "title": "1C: Указать токен backend" },
+      { "command": "pusk.openDetails", "title": "1C: Показать подробности" },
+      { "command": "pusk.terminateSession", "title": "1C: Завершить сеанс" },
+      { "command": "pusk.interruptSession", "title": "1C: Прервать серверный вызов" },
+      { "command": "pusk.disconnectConnection", "title": "1C: Разорвать соединение" },
+      { "command": "pusk.turnOffProcess", "title": "1C: Выключить рабочий процесс" },
+      { "command": "pusk.enableSessionLock", "title": "1C: Заблокировать начало сеансов" },
+      { "command": "pusk.disableSessionLock", "title": "1C: Разрешить начало сеансов" },
+      { "command": "pusk.enableScheduledJobsLock", "title": "1C: Заблокировать регламентные задания" },
+      { "command": "pusk.disableScheduledJobsLock", "title": "1C: Разрешить регламентные задания" }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        { "id": "pusk", "title": "Кластеры 1С", "icon": "media/cluster.svg" }
+      ]
+    },
+    "views": {
+      "pusk": [
+        { "id": "puskClusters", "name": "Кластеры", "icon": "media/cluster.svg", "contextualTitle": "Кластеры 1С" }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "puskClusters",
+        "contents": "Подключения к RAS ещё не настроены.\n[Добавить подключение](command:pusk.addConnection)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        { "command": "pusk.addConnection", "when": "view == puskClusters", "group": "navigation" },
+        { "command": "pusk.refresh", "when": "view == puskClusters", "group": "navigation" }
+      ],
+      "view/item/context": [
+        { "command": "pusk.removeConnection", "when": "view == puskClusters && viewItem == connection", "group": "inline" },
+        { "command": "pusk.setClusterCredentials", "when": "view == puskClusters && viewItem == cluster", "group": "1_auth" },
+        { "command": "pusk.setInfobaseCredentials", "when": "view == puskClusters && viewItem == infobase", "group": "1_auth" },
+        { "command": "pusk.terminateSession", "when": "view == puskClusters && viewItem == session", "group": "2_manage" },
+        { "command": "pusk.interruptSession", "when": "view == puskClusters && viewItem == session", "group": "2_manage" },
+        { "command": "pusk.disconnectConnection", "when": "view == puskClusters && viewItem == racConnection", "group": "2_manage" },
+        { "command": "pusk.turnOffProcess", "when": "view == puskClusters && viewItem == process", "group": "2_manage" },
+        { "command": "pusk.enableSessionLock", "when": "view == puskClusters && viewItem == infobase", "group": "3_locks" },
+        { "command": "pusk.disableSessionLock", "when": "view == puskClusters && viewItem == infobase", "group": "3_locks" },
+        { "command": "pusk.enableScheduledJobsLock", "when": "view == puskClusters && viewItem == infobase", "group": "3_locks" },
+        { "command": "pusk.disableScheduledJobsLock", "when": "view == puskClusters && viewItem == infobase", "group": "3_locks" }
+      ]
+    },
+    "configuration": {
+      "title": "1C Cluster Manager",
+      "properties": {
+        "pusk.backend.url": {
+          "type": "string",
+          "default": "http://127.0.0.1:32145",
+          "description": "URL самостоятельного backend управления кластерами 1С"
+        },
+        "pusk.backend.autoStart": {
+          "type": "boolean",
+          "default": true,
+          "description": "Автоматически запускать встроенный локальный backend"
+        }
+      }
+    }
+  },
+  "files": [
+    "out/**",
+    "backend/**",
+    "media/**",
+    "package.json",
+    "README.md",
+    "LICENSE"
+  ]
+}
