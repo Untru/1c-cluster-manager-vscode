@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import type { BackendConnection, Credentials, RacResponse, ResourceType } from "./model";
+import type { BackendConnection, Credentials, RacResponse, RasApplicationInfo, RasInstallation, RasServiceInfo, RasStartInput, ResourceType } from "./model";
 import { SecretRepository } from "./secrets";
 
 export class BackendError extends Error {
@@ -27,6 +27,38 @@ export class ApiClient {
 
   public async removeConnection(id: string): Promise<void> {
     await this.request(`/api/connections/${encodeURIComponent(id)}`, { method: "DELETE" });
+  }
+
+  public async rasInstallations(): Promise<RasInstallation[]> {
+    return (await this.request<{ items: RasInstallation[] }>("/api/ras/installations")).items;
+  }
+
+  public async rasApplications(): Promise<RasApplicationInfo[]> {
+    return (await this.request<{ items: RasApplicationInfo[] }>("/api/ras/applications")).items;
+  }
+
+  public startRasApplication(input: RasStartInput): Promise<RasApplicationInfo> {
+    return this.request("/api/ras/applications", { method: "POST", body: input });
+  }
+
+  public async stopRasApplication(id: string): Promise<void> {
+    await this.request(`/api/ras/applications/${encodeURIComponent(id)}`, { method: "DELETE" });
+  }
+
+  public async rasServices(): Promise<RasServiceInfo[]> {
+    return (await this.request<{ items: RasServiceInfo[] }>("/api/ras/services")).items;
+  }
+
+  public installRasService(input: RasStartInput & { serviceName?: string; displayName?: string; startType?: "auto" | "demand" }): Promise<RasServiceInfo> {
+    return this.request("/api/ras/services", { method: "POST", body: input });
+  }
+
+  public rasServiceAction(name: string, action: "start" | "stop"): Promise<RasServiceInfo> {
+    return this.request(`/api/ras/services/${encodeURIComponent(name)}/${action}`, { method: "POST" });
+  }
+
+  public async removeRasService(name: string): Promise<void> {
+    await this.request(`/api/ras/services/${encodeURIComponent(name)}`, { method: "DELETE" });
   }
 
   public async clusters(connectionId: string): Promise<RacResponse> {

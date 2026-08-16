@@ -18,6 +18,35 @@ export interface Credentials {
   password?: string;
 }
 
+export interface RasInstallation {
+  path: string;
+  version: string;
+}
+
+export interface RasStartInput {
+  rasPath: string;
+  port: number;
+  agentHost: string;
+  agentPort: number;
+  monitorPort?: number;
+}
+
+export interface RasApplicationInfo extends RasStartInput {
+  id: string;
+  pid: number;
+  version: string;
+  startedAt: string;
+}
+
+export interface RasServiceInfo extends RasStartInput {
+  serviceName: string;
+  displayName: string;
+  startType: "auto" | "demand";
+  version: string;
+  installedAt: string;
+  status: "running" | "stopped" | "pending" | "missing" | "unknown";
+}
+
 export const RESOURCE_TYPES = [
   "infobases",
   "sessions",
@@ -30,4 +59,3 @@ export const RESOURCE_TYPES = [
 ] as const;
 
 export type ResourceType = typeof RESOURCE_TYPES[number];
-

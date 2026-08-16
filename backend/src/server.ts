@@ -3,6 +3,7 @@ import { URL } from "node:url";
 import { ConfigRepository } from "./config";
 import { HttpError } from "./errors";
 import { RacClient } from "./rac/client";
+import { RasLifecycle } from "./ras/lifecycle";
 import type { ConnectionInput, RequestCredentials } from "./types";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -82,6 +83,9 @@ function authorize(request: IncomingMessage, token?: string): void {
 export interface BackendDependencies {
   repository: Pick<ConfigRepository, "list" | "get" | "add" | "remove">;
   rac: Pick<RacClient, "execute">;
+  ras?: Pick<RasLifecycle,
+    "installations" | "startApplication" | "listApplications" | "stopApplication" |
+    "listServices" | "installService" | "startService" | "stopService" | "removeService">;
   token?: string;
 }
 
@@ -99,6 +103,53 @@ export function createBackendServer(dependencies: BackendDependencies): Server {
       }
 
       if (segments[0] !== "api") throw new HttpError(404, "Route not found");
+
+      if (segments[1] === "ras") {
+        if (!dependencies.ras) throw new HttpError(501, "RAS lifecycle management is not configured");
+        const area = segments[2];
+        if (area === "installations" && segments.length === 3 && method === "GET") {
+          sendJson(response, 200, { items: await dependencies.ras.installations() });
+          return;
+        }
+        if (area === "applications") {
+          if (segments.length === 3 && method === "GET") {
+            sendJson(response, 200, { items: await dependencies.ras.listApplications() });
+            return;
+          }
+          if (segments.length === 3 && method === "POST") {
+            sendJson(response, 201, await dependencies.ras.startApplication(await readJson(request)));
+            return;
+          }
+          if (segments.length === 4 && method === "DELETE") {
+            await dependencies.ras.stopApplication(requireUuid(segments[3], "applicationId"));
+            response.writeHead(204).end();
+            return;
+          }
+        }
+        if (area === "services") {
+          if (segments.length === 3 && method === "GET") {
+            sendJson(response, 200, { items: await dependencies.ras.listServices() });
+            return;
+          }
+          if (segments.length === 3 && method === "POST") {
+            sendJson(response, 201, await dependencies.ras.installService(await readJson(request)));
+            return;
+          }
+          const serviceName = segments[3];
+          if (segments.length === 4 && method === "DELETE" && serviceName) {
+            await dependencies.ras.removeService(serviceName);
+            response.writeHead(204).end();
+            return;
+          }
+          if (segments.length === 5 && method === "POST" && serviceName) {
+            if (segments[4] === "start") sendJson(response, 200, await dependencies.ras.startService(serviceName));
+            else if (segments[4] === "stop") sendJson(response, 200, await dependencies.ras.stopService(serviceName));
+            else throw new HttpError(404, "Route not found");
+            return;
+          }
+        }
+        throw new HttpError(404, "Route not found");
+      }
 
       if (segments.length === 2 && segments[1] === "connections") {
         if (method === "GET") {
