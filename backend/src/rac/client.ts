@@ -7,6 +7,18 @@ import { parseRacOutput } from "./parser";
 const DEFAULT_TIMEOUT_MS = 30_000;
 const MAX_OUTPUT_BYTES = 10 * 1024 * 1024;
 
+const AUTHORIZATION_ERROR_PATTERNS = [
+  /недостаточно\s+прав/i,
+  /аутентификац(?:ия|ии).*не\s+(?:выполнена|пройдена|удалась)/i,
+  /authentication\s+(?:failed|required)/i,
+  /insufficient\s+(?:permissions|privileges|rights)/i,
+  /access\s+denied/i,
+];
+
+export function isAuthorizationError(message: string): boolean {
+  return AUTHORIZATION_ERROR_PATTERNS.some((pattern) => pattern.test(message));
+}
+
 function decode(buffer: Buffer): string {
   try {
     return new TextDecoder("utf-8", { fatal: true }).decode(buffer);
@@ -38,7 +50,15 @@ export class RacClient {
       : `${connection.host}:${connection.port}`;
     const args = [...command, ...credentialArgs(credentials, includeInfobaseCredentials), endpoint];
     const startedAt = performance.now();
-    const output = await this.run(racPath, args);
+    let output: string;
+    try {
+      output = await this.run(racPath, args);
+    } catch (error) {
+      if (error instanceof HttpError && isAuthorizationError(error.message)) {
+        throw new HttpError(401, error.message, { code: "RAC_AUTH_REQUIRED" });
+      }
+      throw error;
+    }
     return { records: parseRacOutput(output), elapsedMs: Math.round(performance.now() - startedAt) };
   }
 
