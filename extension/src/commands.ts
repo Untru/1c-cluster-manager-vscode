@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { ApiClient } from "./api";
 import { recordId } from "./presentation";
-import { showInfobaseProperties, showSessions } from "./panels";
+import { showInfobaseProperties, showLocks, showSessions } from "./panels";
 import { SecretRepository } from "./secrets";
 import { ClusterNode, ClusterTreeProvider } from "./tree";
 
@@ -117,6 +117,10 @@ export function registerCommands(
 
   command("onecClusterManager.openSessions", async (node: ClusterNode) => {
     await showSessions(context, api, tree, node);
+  });
+
+  command("onecClusterManager.openLocks", async (node: ClusterNode) => {
+    await showLocks(context, api, tree, node);
   });
 
   const runRecordAction = async (node: ClusterNode, action: string, body: Record<string, unknown>, question: string): Promise<void> => {

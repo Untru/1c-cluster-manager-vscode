@@ -118,6 +118,41 @@ function sessionsHtml(webview: vscode.Webview, sessions: RacRecord[], bases: Rac
       </script></body></html>`;
 }
 
+function locksHtml(
+  webview: vscode.Webview,
+  locks: RacRecord[],
+  bases: RacRecord[],
+  sessions: RacRecord[],
+  connections: RacRecord[],
+  processes: RacRecord[],
+): string {
+  const scriptNonce = nonce();
+  const baseNames = new Map(bases.map((base) => [base.infobase, base.name || base.infobase]));
+  const sessionById = new Map(sessions.map((session) => [session.session, session]));
+  const connectionById = new Map(connections.map((connection) => [connection.connection, connection]));
+  const processById = new Map(processes.map((process) => [process.process, process]));
+  const rows = locks.map((lock) => {
+    const connection = connectionById.get(lock.connection) ?? {};
+    const session = sessionById.get(lock.session) ?? {};
+    const process = processById.get(connection.process || session.process) ?? {};
+    const infobaseId = connection.infobase || session.infobase || "";
+    const search = [
+      ...Object.values(lock), ...Object.values(connection), ...Object.values(session), ...Object.values(process), baseNames.get(infobaseId) ?? "",
+    ].join(" ").toLowerCase();
+    return `<tr data-search="${escapeHtml(search)}"><td>${escapeHtml(lock.descr)}</td><td>${escapeHtml(baseNames.get(infobaseId) ?? (infobaseId === "00000000-0000-0000-0000-000000000000" ? "" : infobaseId))}</td>
+      <td>${escapeHtml(connection["conn-id"] || lock.connection)}</td><td>${escapeHtml(session["session-id"] || connection["session-number"] || (lock.session === "00000000-0000-0000-0000-000000000000" ? "" : lock.session))}</td>
+      <td>${escapeHtml(connection.host || session.host)}</td><td>${escapeHtml(applicationName(connection.application || session["app-id"]))}</td><td>${escapeHtml(process.host)}</td><td>${escapeHtml(process.port)}</td><td>${escapeHtml(process.pid)}</td><td>${escapeHtml(dateTime(lock.locked))}</td>
+      <td class="mono">${escapeHtml(lock.object === "00000000-0000-0000-0000-000000000000" ? "" : lock.object)}</td></tr>`;
+  }).join("");
+  return `<!doctype html><html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${scriptNonce}'"><style>${baseStyles()}
+      body{padding:14px}.toolbar{position:sticky;top:0;background:var(--vscode-editor-background);z-index:2;padding-bottom:10px;margin:0}.search{max-width:620px}.table-wrap{overflow:auto;border:1px solid var(--vscode-panel-border)}table{border-collapse:collapse;min-width:1500px;width:100%}th,td{border-right:1px solid var(--vscode-panel-border);border-bottom:1px solid var(--vscode-panel-border);padding:7px 8px;text-align:left;white-space:nowrap}th{position:sticky;top:0;background:var(--vscode-editor-background);z-index:1}tr:hover td{background:var(--vscode-list-hoverBackground)}.mono{font-family:var(--vscode-editor-font-family)}.count{color:var(--vscode-descriptionForeground)}
+    </style></head><body><div class="toolbar"><input id="search" class="search" placeholder="Поиск по блокировкам"><span class="count" id="count">${locks.length} блокировок</span><button class="secondary" id="export">Экспорт CSV</button><button id="refresh">Обновить</button></div>
+      ${locks.length ? `<div class="table-wrap"><table><thead><tr><th>Описание</th><th>Инфобаза</th><th>Соединение</th><th>Сеанс</th><th>Компьютер</th><th>Приложение</th><th>Сервер</th><th>Порт</th><th>PID</th><th>Установлена</th><th>Объект</th></tr></thead><tbody>${rows}</tbody></table></div>` : `<div class="empty">Активных блокировок нет</div>`}
+      <script nonce="${scriptNonce}">const vscode=acquireVsCodeApi(),rows=[...document.querySelectorAll('tbody tr')],search=document.getElementById('search'),count=document.getElementById('count');search.addEventListener('input',()=>{const q=search.value.trim().toLowerCase();let visible=0;rows.forEach(row=>{const show=!q||row.dataset.search.includes(q);row.hidden=!show;if(show)visible++});count.textContent=visible+' блокировок'});document.getElementById('refresh').addEventListener('click',()=>vscode.postMessage({command:'refresh'}));document.getElementById('export').addEventListener('click',()=>vscode.postMessage({command:'export'}));</script>
+    </body></html>`;
+}
+
 export async function showInfobaseProperties(
   context: vscode.ExtensionContext,
   api: ApiClient,
@@ -188,6 +223,50 @@ export async function showSessions(
         if (!target) return;
         const columns = ["session", "user-name", "infobase", "session-id", "started-at", "last-active-at", "host", "app-id", "pid", "connection", "calls-all", "memory-current"];
         const csv = [columns, ...sessions.map((item) => columns.map((column) => item[column] ?? ""))].map((row) => row.map((cell) => `"${cell.replaceAll('"', '""')}"`).join(";")).join("\r\n");
+        await vscode.workspace.fs.writeFile(target, Buffer.from(`\uFEFF${csv}`, "utf8"));
+      }
+    } catch (error) { void vscode.window.showErrorMessage(`1C Cluster Manager: ${(error as Error).message}`); }
+  }, undefined, context.subscriptions);
+}
+
+export async function showLocks(
+  context: vscode.ExtensionContext,
+  api: ApiClient,
+  tree: ClusterTreeProvider,
+  node: ClusterNode,
+): Promise<void> {
+  if (!node.connectionId || !node.clusterId) return;
+  let locks: RacRecord[] = [];
+  let bases: RacRecord[] = [];
+  let sessions: RacRecord[] = [];
+  let connections: RacRecord[] = [];
+  let processes: RacRecord[] = [];
+  const load = async (): Promise<void> => {
+    [locks, bases, sessions, connections, processes] = await Promise.all([
+      api.resources(node.connectionId!, node.clusterId!, "locks").then((value) => value.records),
+      api.resources(node.connectionId!, node.clusterId!, "infobases").then((value) => value.records),
+      api.resources(node.connectionId!, node.clusterId!, "sessions").then((value) => value.records),
+      api.resources(node.connectionId!, node.clusterId!, "connections").then((value) => value.records),
+      api.resources(node.connectionId!, node.clusterId!, "processes").then((value) => value.records),
+    ]);
+  };
+  await load();
+  const panel = vscode.window.createWebviewPanel("onecLocks", "1С: Блокировки", vscode.ViewColumn.Active, { enableScripts: true, retainContextWhenHidden: true });
+  panel.webview.html = locksHtml(panel.webview, locks, bases, sessions, connections, processes);
+  context.subscriptions.push(panel);
+  const refresh = async (): Promise<void> => {
+    await load();
+    panel.webview.html = locksHtml(panel.webview, locks, bases, sessions, connections, processes);
+    tree.refresh(node);
+  };
+  panel.webview.onDidReceiveMessage(async (message: { command?: string }) => {
+    try {
+      if (message.command === "refresh") await refresh();
+      if (message.command === "export") {
+        const target = await vscode.window.showSaveDialog({ defaultUri: vscode.Uri.file(`locks-${new Date().toISOString().slice(0, 10)}.csv`), filters: { CSV: ["csv"] } });
+        if (!target) return;
+        const columns = ["descr", "connection", "session", "object", "locked"];
+        const csv = [columns, ...locks.map((item) => columns.map((column) => item[column] ?? ""))].map((row) => row.map((cell) => `"${cell.replaceAll('"', '""')}"`).join(";")).join("\r\n");
         await vscode.workspace.fs.writeFile(target, Buffer.from(`\uFEFF${csv}`, "utf8"));
       }
     } catch (error) { void vscode.window.showErrorMessage(`1C Cluster Manager: ${(error as Error).message}`); }

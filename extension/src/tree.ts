@@ -81,6 +81,10 @@ export class ClusterTreeProvider implements vscode.TreeDataProvider<ClusterNode>
           node.command = { command: "onecClusterManager.openSessions", title: "Открыть список сеансов", arguments: [node] };
           node.tooltip = "Открыть табличный список сеансов; стрелка слева разворачивает дерево";
         }
+        if (resource === "locks") {
+          node.command = { command: "onecClusterManager.openLocks", title: "Открыть таблицу блокировок", arguments: [node] };
+          node.tooltip = "Открыть таблицу блокировок; стрелка слева разворачивает дерево";
+        }
         return node;
       });
     }
