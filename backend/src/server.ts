@@ -137,7 +137,7 @@ export function createBackendServer(dependencies: BackendDependencies): Server {
       const segments = url.pathname.split("/").filter(Boolean).map(decodeURIComponent);
 
       if (method === "GET" && url.pathname === "/health") {
-        sendJson(response, 200, { status: "ok", version: "0.1.0" });
+        sendJson(response, 200, { status: "ok", version: "0.1.1" });
         return;
       }
 

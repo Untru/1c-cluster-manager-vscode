@@ -12,7 +12,7 @@ function result(value: unknown) {
 
 export function createMcpServer(client: BackendClient): McpServer {
   const server = new McpServer(
-    { name: "onec-cluster-manager", version: "0.1.0" },
+    { name: "onec-cluster-manager", version: "0.1.1" },
     { instructions: "Сначала получите подключения и кластеры. Перед изменением или удалением информационной базы повторно получите её список и сверяйте UUID. Удаление снимает только регистрацию из кластера и никогда не удаляет физическую базу данных." },
   );
 
