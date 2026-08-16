@@ -26,6 +26,41 @@
 - хранение паролей администраторов в VS Code `SecretStorage`;
 - опциональная bearer-аутентификация backend;
 - автоматический запуск встроенного backend при открытии панели расширения.
+- регистрация и безопасное снятие регистрации информационных баз без удаления физической БД;
+- управление выдачей лицензий сервером 1С;
+- локальный MCP-сервер для агентской разработки.
+
+## MCP для агентов
+
+Workspace-конфигурация [`.vscode/mcp.json`](.vscode/mcp.json) запускает stdio-сервер из пакета [`mcp`](mcp). Перед использованием соберите проект и запустите backend. MCP предоставляет инструменты:
+
+- `connections_list`, `clusters_list`;
+- `infobases_list`, `infobase_get`, `infobase_register`, `infobase_controls_set`, `infobase_unregister`;
+- `sessions_list`, `session_terminate`, `locks_list`.
+
+По умолчанию MCP подключается к `http://127.0.0.1:32145`. Адрес, bearer-токен и административные учётные данные можно передать переменными `ONEC_CLUSTER_MANAGER_BACKEND_URL`, `ONEC_CLUSTER_MANAGER_API_TOKEN`, `ONEC_CLUSTER_MANAGER_CLUSTER_USER`, `ONEC_CLUSTER_MANAGER_CLUSTER_PASSWORD`, `ONEC_CLUSTER_MANAGER_INFOBASE_USER` и `ONEC_CLUSTER_MANAGER_INFOBASE_PASSWORD`. Не добавляйте секреты в `mcp.json`.
+
+Инструмент `infobase_unregister` требует явного подтверждения `UNREGISTER`. Backend намеренно не добавляет `--drop-database`: удаляется только регистрация из кластера.
+
+## Полный E2E-цикл
+
+```powershell
+$env:ONEC_E2E_RAC_PATH = "C:\Program Files\1cv8\8.3.27.2214\bin\rac.exe"
+npm run test:e2e
+npm run test:visual:launch
+```
+
+E2E-тест требует Docker, доступный тестовый RAS (по умолчанию `localhost:2545`) и образ `akocur/postgresql-1c-17:1`. Он создаёт контейнер с уникальным именем и временную базу `codex_e2e_*`, проверяет регистрацию, блокировку сеансов, блокировку регламентных заданий, запрет/разрешение выдачи лицензий и снятие регистрации. Перед очисткой контейнера тест отдельно проверяет, что физическая БД не была удалена. Существующие информационные базы тест не изменяет.
+
+Последний успешный отчёт: [`docs/test-results/full-cycle.json`](docs/test-results/full-cycle.json).
+
+### Визуальная проверка
+
+![Временная база в дереве трёх кластеров](docs/images/vscode-visual-e2e-blocked.png)
+
+![Блокировки и выдача лицензий в свойствах временной базы](docs/images/vscode-visual-e2e-controls.png)
+
+Снимки сделаны в реальном изолированном Extension Development Host: на первом видна временная база среди подключений 8.3.24, 8.3.27 и 8.5.1; на втором — её полные свойства `sessions-deny: on`, `scheduled-jobs-deny: on` и `license-distribution: deny`. После снимка сценарий вернул `off/off/allow` и снял регистрацию.
 
 ## Быстрый старт
 

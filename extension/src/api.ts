@@ -39,6 +39,27 @@ export class ApiClient {
     });
   }
 
+  public async infobaseDetails(connectionId: string, clusterId: string, infobaseId: string): Promise<RacResponse> {
+    return this.request(`/api/connections/${connectionId}/clusters/${clusterId}/infobases/${infobaseId}`, {
+      credentials: await this.credentials(connectionId, clusterId, infobaseId),
+    });
+  }
+
+  public async createInfobase(connectionId: string, clusterId: string, body: Record<string, unknown>): Promise<RacResponse> {
+    return this.request(`/api/connections/${connectionId}/clusters/${clusterId}/infobases`, {
+      method: "POST",
+      body,
+      credentials: await this.credentials(connectionId, clusterId),
+    });
+  }
+
+  public async removeInfobase(connectionId: string, clusterId: string, infobaseId: string): Promise<void> {
+    await this.request(`/api/connections/${connectionId}/clusters/${clusterId}/infobases/${infobaseId}`, {
+      method: "DELETE",
+      credentials: await this.credentials(connectionId, clusterId, infobaseId),
+    });
+  }
+
   public async action(
     connectionId: string,
     clusterId: string,

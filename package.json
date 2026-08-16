@@ -4,18 +4,21 @@
   "private": true,
   "workspaces": [
     "backend",
-    "extension"
+    "extension",
+    "mcp"
   ],
   "scripts": {
-    "build": "npm run build --workspace @onec-cluster-manager/backend && npm run build --workspace onec-cluster-manager",
-    "test": "npm run test --workspace @onec-cluster-manager/backend && npm run test --workspace onec-cluster-manager",
-    "check": "npm run build && npm test"
+    "build": "npm run build --workspace @onec-cluster-manager/backend && npm run build --workspace onec-cluster-manager && npm run build --workspace @onec-cluster-manager/mcp",
+    "test": "npm run test --workspace @onec-cluster-manager/backend && npm run test --workspace onec-cluster-manager && npm run test --workspace @onec-cluster-manager/mcp",
+    "check": "npm run build && npm test",
+    "test:e2e": "npm run build && node scripts/e2e-full-cycle.js",
+    "test:visual:launch": "npm run build && node scripts/launch-visual-test.js"
   },
   "devDependencies": {
+    "@vscode/test-electron": "^3.1.0",
     "typescript": "^5.9.2"
   },
   "engines": {
     "node": ">=20"
   }
 }
-

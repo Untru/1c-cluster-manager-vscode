@@ -77,8 +77,40 @@ export function registerCommands(
     if (token !== undefined) await secrets.setBackendToken(token);
   });
 
+  command("onecClusterManager.createInfobase", async (node: ClusterNode) => {
+    if (!node?.connectionId || !node.clusterId || node.resource !== "infobases") return;
+    const name = await requiredInput("Имя новой регистрации информационной базы", { placeHolder: "test_base" });
+    if (!name) return;
+    const dbmsPick = await vscode.window.showQuickPick(["PostgreSQL", "MSSQLServer", "IBMDB2", "OracleDatabase"], { placeHolder: "СУБД" });
+    if (!dbmsPick) return;
+    const dbServer = await requiredInput("Сервер СУБД", { value: "localhost" });
+    if (!dbServer) return;
+    const dbName = await requiredInput("Имя физической базы данных", { value: name });
+    if (!dbName) return;
+    const locale = await requiredInput("Локаль", { value: "ru_RU" });
+    if (!locale) return;
+    const answer = await vscode.window.showWarningMessage(`Зарегистрировать «${name}» в кластере? Физическая база данных создаваться не будет.`, { modal: true }, "Зарегистрировать");
+    if (answer !== "Зарегистрировать") return;
+    await api.createInfobase(node.connectionId, node.clusterId, { name, dbms: dbmsPick, dbServer, dbName, locale, description: "Создано через 1C Cluster Manager", createDatabase: false });
+    tree.refresh(node);
+  });
+
+  command("onecClusterManager.removeInfobase", async (node: ClusterNode) => {
+    if (!node?.connectionId || !node.clusterId || node.resource !== "infobases" || !node.record) return;
+    const name = node.record.name || recordId("infobases", node.record);
+    const answer = await vscode.window.showWarningMessage(`Удалить из кластера только регистрацию «${name}»? Физическая база данных не удаляется.`, { modal: true }, "Удалить регистрацию");
+    if (answer !== "Удалить регистрацию") return;
+    await api.removeInfobase(node.connectionId, node.clusterId, recordId("infobases", node.record));
+    tree.refresh();
+  });
+
   command("onecClusterManager.openDetails", async (node: ClusterNode) => {
-    const document = await vscode.workspace.openTextDocument({ language: "json", content: `${JSON.stringify(node.record ?? {}, null, 2)}\n` });
+    let record = node.record ?? {};
+    if (node.resource === "infobases" && node.connectionId && node.clusterId && node.record) {
+      const response = await api.infobaseDetails(node.connectionId, node.clusterId, recordId("infobases", node.record));
+      record = response.records[0] ?? record;
+    }
+    const document = await vscode.workspace.openTextDocument({ language: "json", content: `${JSON.stringify(record, null, 2)}\n` });
     await vscode.window.showTextDocument(document, { preview: true });
   });
 
@@ -103,4 +135,6 @@ export function registerCommands(
   command("onecClusterManager.disableSessionLock", (node: ClusterNode) => runRecordAction(node, "settings", { sessionsDeny: false }, "Разрешить начало новых сеансов?"));
   command("onecClusterManager.enableScheduledJobsLock", (node: ClusterNode) => runRecordAction(node, "settings", { scheduledJobsDeny: true }, "Заблокировать регламентные задания?"));
   command("onecClusterManager.disableScheduledJobsLock", (node: ClusterNode) => runRecordAction(node, "settings", { scheduledJobsDeny: false }, "Разрешить регламентные задания?"));
+  command("onecClusterManager.denyLicenseDistribution", (node: ClusterNode) => runRecordAction(node, "settings", { licenseDistribution: "deny" }, "Запретить выдачу лицензий сервером 1С для этой базы?"));
+  command("onecClusterManager.allowLicenseDistribution", (node: ClusterNode) => runRecordAction(node, "settings", { licenseDistribution: "allow" }, "Разрешить выдачу лицензий сервером 1С для этой базы?"));
 }

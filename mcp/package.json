@@ -1,16 +1,23 @@
 {
-  "name": "@onec-cluster-manager/backend",
+  "name": "@onec-cluster-manager/mcp",
   "version": "0.1.0",
   "private": true,
   "type": "commonjs",
   "main": "out/index.js",
+  "bin": {
+    "onec-cluster-manager-mcp": "out/index.js"
+  },
   "scripts": {
     "build": "node ../scripts/clean-out.js && tsc -p tsconfig.json",
     "start": "node out/index.js",
-    "dev": "node --watch out/index.js",
     "test": "npm run build && node --test out/**/*.test.js"
   },
+  "dependencies": {
+    "@modelcontextprotocol/server": "^2.0.0",
+    "zod": "^4.2.0"
+  },
   "devDependencies": {
+    "@modelcontextprotocol/client": "^2.0.0",
     "@types/node": "^24.3.0"
   }
 }

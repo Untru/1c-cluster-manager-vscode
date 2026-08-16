@@ -75,7 +75,7 @@ export class ClusterTreeProvider implements vscode.TreeDataProvider<ClusterNode>
     if (element.kind === "cluster") {
       return RESOURCE_TYPES.map((resource) => {
         const node = new ClusterNode("resource", resourceLabel(resource), vscode.TreeItemCollapsibleState.Collapsed, element.connectionId, element.clusterId, resource);
-        node.contextValue = "resource";
+        node.contextValue = `resource.${resource}`;
         node.iconPath = new vscode.ThemeIcon(RESOURCE_ICONS[resource]);
         return node;
       });

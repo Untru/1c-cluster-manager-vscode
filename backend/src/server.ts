@@ -72,6 +72,18 @@ function optionalUuidQuery(url: URL, name: string): string[] {
   return value ? [`--${name}=${requireUuid(value, name)}`] : [];
 }
 
+function option(body: Record<string, unknown>, name: string, label = name, maxLength = 255): string {
+  const value = String(body[name] ?? "").trim();
+  if (!value || value.length > maxLength || /[\u0000-\u001f\u007f]/.test(value)) throw new HttpError(400, `${label} must contain 1-${maxLength} characters without control characters`);
+  return value;
+}
+
+function secretOption(body: Record<string, unknown>, name: string, maxLength = 255): string {
+  const value = String(body[name] ?? "");
+  if (!value || value.length > maxLength || /[\u0000\r\n]/.test(value)) throw new HttpError(400, `${name} must contain 1-${maxLength} characters without line breaks`);
+  return value;
+}
+
 function authorize(request: IncomingMessage, token?: string): void {
   if (!token) return;
   if (request.headers.authorization !== `Bearer ${token}`) {
@@ -135,6 +147,26 @@ export function createBackendServer(dependencies: BackendDependencies): Server {
       const clusterId = requireUuid(segments[4], "clusterId");
       const resource = segments[5];
 
+      if (segments.length === 6 && resource === "infobases" && method === "POST") {
+        const body = await readJson(request);
+        const dbms = option(body, "dbms");
+        if (!["MSSQLServer", "PostgreSQL", "IBMDB2", "OracleDatabase"].includes(dbms)) throw new HttpError(400, "Unsupported dbms");
+        const command = [
+          "infobase", "create", `--cluster=${clusterId}`,
+          `--name=${option(body, "name", "name", 100)}`,
+          `--dbms=${dbms}`,
+          `--db-server=${option(body, "dbServer", "dbServer")}`,
+          `--db-name=${option(body, "dbName", "dbName", 100)}`,
+          `--locale=${option(body, "locale", "locale", 50)}`,
+        ];
+        if (typeof body.description === "string" && body.description.trim()) command.push(`--descr=${option(body, "description", "description", 500)}`);
+        if (typeof body.dbUser === "string" && body.dbUser.trim()) command.push(`--db-user=${option(body, "dbUser", "dbUser", 100)}`);
+        if (typeof body.dbPassword === "string" && body.dbPassword) command.push(`--db-pwd=${secretOption(body, "dbPassword")}`);
+        if (body.createDatabase === true) command.push("--create-database");
+        sendJson(response, 201, await dependencies.rac.execute(connection, command, credentials));
+        return;
+      }
+
       if (segments.length === 6 && method === "GET" && RESOURCE_COMMANDS[resource]) {
         const filters = [
           ...optionalUuidQuery(url, "infobase"),
@@ -150,6 +182,14 @@ export function createBackendServer(dependencies: BackendDependencies): Server {
 
       const targetId = segments[6] ? requireUuid(segments[6], `${resource}Id`) : undefined;
       const action = segments[7];
+      if (method === "GET" && resource === "infobases" && targetId && segments.length === 7) {
+        sendJson(response, 200, await dependencies.rac.execute(connection, ["infobase", "info", `--cluster=${clusterId}`, `--infobase=${targetId}`], credentials, true));
+        return;
+      }
+      if (method === "DELETE" && resource === "infobases" && targetId && segments.length === 7) {
+        sendJson(response, 200, await dependencies.rac.execute(connection, ["infobase", "drop", `--cluster=${clusterId}`, `--infobase=${targetId}`], credentials, true));
+        return;
+      }
       if (method === "POST" && targetId && action) {
         const body = await readJson(request);
         let command: string[] | undefined;
@@ -172,6 +212,7 @@ export function createBackendServer(dependencies: BackendDependencies): Server {
           includeInfobaseCredentials = true;
           if (typeof body.sessionsDeny === "boolean") command.push(`--sessions-deny=${body.sessionsDeny ? "on" : "off"}`);
           if (typeof body.scheduledJobsDeny === "boolean") command.push(`--scheduled-jobs-deny=${body.scheduledJobsDeny ? "on" : "off"}`);
+          if (body.licenseDistribution === "allow" || body.licenseDistribution === "deny") command.push(`--license-distribution=${body.licenseDistribution}`);
           for (const [bodyName, optionName] of [["deniedMessage", "denied-message"], ["permissionCode", "permission-code"]] as const) {
             const value = body[bodyName];
             if (typeof value === "string" && value) command.push(`--${optionName}=${value}`);
