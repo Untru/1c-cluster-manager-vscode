@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import type { BackendConnection, Credentials, RacResponse, ResourceType } from "./model";
+import type { BackendConnection, Credentials, RacCapabilities, RacResponse, ResourceType } from "./model";
 import { SecretRepository } from "./secrets";
 
 export class BackendError extends Error {
@@ -39,9 +39,25 @@ export class ApiClient {
     return this.request(`/api/connections/${connectionId}/clusters`);
   }
 
-  public async resources(connectionId: string, clusterId: string, resource: ResourceType): Promise<RacResponse> {
+  public capabilities(connectionId: string): Promise<RacCapabilities> {
+    return this.request(`/api/connections/${connectionId}/capabilities`);
+  }
+
+  public clusterDetails(connectionId: string, clusterId: string): Promise<RacResponse> {
     return this.authorized(connectionId, clusterId, "cluster", undefined, (credentials) =>
-      this.request(`/api/connections/${connectionId}/clusters/${clusterId}/${resource}`, { credentials }));
+      this.request(`/api/connections/${connectionId}/clusters/${clusterId}`, { credentials }));
+  }
+
+  public async resources(connectionId: string, clusterId: string, resource: ResourceType, filters: Record<string, string> = {}): Promise<RacResponse> {
+    const query = new URLSearchParams(filters).toString();
+    const infobaseId = filters.infobase;
+    return this.authorized(connectionId, clusterId, infobaseId ? "infobase" : "cluster", infobaseId, (credentials) =>
+      this.request(`/api/connections/${connectionId}/clusters/${clusterId}/${resource}${query ? `?${query}` : ""}`, { credentials }));
+  }
+
+  public resourceDetails(connectionId: string, clusterId: string, resource: ResourceType, targetId: string, infobaseId?: string): Promise<RacResponse> {
+    return this.authorized(connectionId, clusterId, infobaseId ? "infobase" : "cluster", infobaseId, (credentials) =>
+      this.request(`/api/connections/${connectionId}/clusters/${clusterId}/${resource}/${targetId}`, { credentials }));
   }
 
   public async infobaseDetails(connectionId: string, clusterId: string, infobaseId: string): Promise<RacResponse> {

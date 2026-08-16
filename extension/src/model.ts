@@ -13,6 +13,12 @@ export interface RacResponse {
   elapsedMs: number;
 }
 
+export interface RacCapabilities {
+  executable: string;
+  version?: string;
+  modes: string[];
+}
+
 export interface Credentials {
   user?: string;
   password?: string;
@@ -27,6 +33,12 @@ export const RESOURCE_TYPES = [
   "processes",
   "managers",
   "services",
+  "rules",
+  "profiles",
+  "counters",
+  "limits",
+  "service-settings",
+  "binary-data-storages",
 ] as const;
 
 export type ResourceType = typeof RESOURCE_TYPES[number];

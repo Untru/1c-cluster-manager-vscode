@@ -15,6 +15,8 @@ export class ClusterNode extends vscode.TreeItem {
     public readonly clusterId?: string,
     public readonly resource?: ResourceType,
     public readonly record?: RacRecord,
+    public readonly infobaseId?: string,
+    public readonly serverId?: string,
   ) {
     super(label, collapsibleState);
   }
@@ -29,6 +31,12 @@ const RESOURCE_ICONS: Record<ResourceType, string> = {
   processes: "gear",
   managers: "organization",
   services: "extensions",
+  rules: "filter",
+  profiles: "shield",
+  counters: "dashboard",
+  limits: "warning",
+  "service-settings": "settings-gear",
+  "binary-data-storages": "archive",
 };
 
 const RECORD_CONTEXT: Record<ResourceType, string> = {
@@ -40,6 +48,19 @@ const RECORD_CONTEXT: Record<ResourceType, string> = {
   processes: "process",
   managers: "manager",
   services: "service",
+  rules: "rule",
+  profiles: "profile",
+  counters: "counter",
+  limits: "limit",
+  "service-settings": "serviceSetting",
+  "binary-data-storages": "binaryDataStorage",
+};
+
+const RESOURCE_MODE: Record<ResourceType, string> = {
+  infobases: "infobase", sessions: "session", connections: "connection", locks: "lock",
+  servers: "server", processes: "process", managers: "manager", services: "service",
+  rules: "rule", profiles: "profile", counters: "counter", limits: "limit",
+  "service-settings": "service-setting", "binary-data-storages": "binary-data-storage",
 };
 
 export class ClusterTreeProvider implements vscode.TreeDataProvider<ClusterNode> {
@@ -69,29 +90,53 @@ export class ClusterTreeProvider implements vscode.TreeDataProvider<ClusterNode>
         node.contextValue = "cluster";
         node.iconPath = new vscode.ThemeIcon("type-hierarchy-sub");
         node.tooltip = this.tooltip(record);
+        node.command = { command: "onecClusterManager.openClusterDetails", title: "Открыть свойства кластера", arguments: [node] };
         return node;
       });
     }
     if (element.kind === "cluster") {
-      return RESOURCE_TYPES.map((resource) => {
+      const capabilities = await this.api.capabilities(element.connectionId!);
+      return RESOURCE_TYPES.filter((resource) => capabilities.modes.includes(RESOURCE_MODE[resource]) && !["rules", "service-settings", "binary-data-storages"].includes(resource)).map((resource) => {
         const node = new ClusterNode("resource", resourceLabel(resource), vscode.TreeItemCollapsibleState.Collapsed, element.connectionId, element.clusterId, resource);
         node.contextValue = `resource.${resource}`;
         node.iconPath = new vscode.ThemeIcon(RESOURCE_ICONS[resource]);
-        if (resource === "sessions") {
-          node.command = { command: "onecClusterManager.openSessions", title: "Открыть список сеансов", arguments: [node] };
-          node.tooltip = "Открыть табличный список сеансов; стрелка слева разворачивает дерево";
-        }
-        if (resource === "locks") {
-          node.command = { command: "onecClusterManager.openLocks", title: "Открыть таблицу блокировок", arguments: [node] };
-          node.tooltip = "Открыть таблицу блокировок; стрелка слева разворачивает дерево";
-        }
+        node.command = { command: "onecClusterManager.openResource", title: `Открыть: ${resourceLabel(resource)}`, arguments: [node] };
+        node.tooltip = `Открыть ${resourceLabel(resource).toLocaleLowerCase("ru-RU")} в центральной области; стрелка слева разворачивает дерево`;
+        return node;
+      });
+    }
+    if (element.kind === "record" && element.resource === "infobases" && element.record) {
+      const infobaseId = recordId("infobases", element.record);
+      const capabilities = await this.api.capabilities(element.connectionId!);
+      const children: ResourceType[] = ["sessions", "connections", "locks"];
+      if (capabilities.modes.includes("binary-data-storage")) children.push("binary-data-storages");
+      return children.map((resource) => {
+        const node = new ClusterNode("resource", resourceLabel(resource), vscode.TreeItemCollapsibleState.Collapsed, element.connectionId, element.clusterId, resource, undefined, infobaseId);
+        node.contextValue = `resource.${resource}`;
+        node.iconPath = new vscode.ThemeIcon(RESOURCE_ICONS[resource]);
+        node.command = { command: "onecClusterManager.openResource", title: `Открыть: ${resourceLabel(resource)}`, arguments: [node] };
+        return node;
+      });
+    }
+    if (element.kind === "record" && element.resource === "servers" && element.record) {
+      const serverId = recordId("servers", element.record);
+      const capabilities = await this.api.capabilities(element.connectionId!);
+      const children: ResourceType[] = ["rules"];
+      if (capabilities.modes.includes("service-setting")) children.push("service-settings");
+      return children.map((resource) => {
+        const node = new ClusterNode("resource", resourceLabel(resource), vscode.TreeItemCollapsibleState.Collapsed, element.connectionId, element.clusterId, resource, undefined, undefined, serverId);
+        node.contextValue = `resource.${resource}`;
+        node.iconPath = new vscode.ThemeIcon(RESOURCE_ICONS[resource]);
+        node.command = { command: "onecClusterManager.openResource", title: `Открыть: ${resourceLabel(resource)}`, arguments: [node] };
         return node;
       });
     }
     if (element.kind === "resource") {
-      const response = await this.api.resources(element.connectionId!, element.clusterId!, element.resource!);
+      const filters = { ...(element.infobaseId ? { infobase: element.infobaseId } : {}), ...(element.serverId ? { server: element.serverId } : {}) };
+      const response = await this.api.resources(element.connectionId!, element.clusterId!, element.resource!, filters);
       return response.records.map((record) => {
-        const node = new ClusterNode("record", recordLabel(element.resource!, record), vscode.TreeItemCollapsibleState.None, element.connectionId, element.clusterId, element.resource, record);
+        const collapsible = ["infobases", "servers"].includes(element.resource!) ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None;
+        const node = new ClusterNode("record", recordLabel(element.resource!, record), collapsible, element.connectionId, element.clusterId, element.resource, record, element.infobaseId, element.serverId);
         node.id = `${element.connectionId}.${element.clusterId}.${element.resource}.${recordId(element.resource!, record)}`;
         node.description = recordDescription(element.resource!, record);
         node.contextValue = RECORD_CONTEXT[element.resource!];

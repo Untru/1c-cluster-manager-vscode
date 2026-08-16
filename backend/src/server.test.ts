@@ -16,8 +16,12 @@ function fixture(token?: string) {
       remove: async () => undefined,
     },
     rac: {
+      capabilities: async () => ({ executable: "rac", version: "8.5.1.1150", modes: ["cluster", "infobase", "session", "connection", "lock", "server", "process", "manager", "service", "rule", "profile", "counter", "limit", "service-setting", "binary-data-storage"] }),
       execute: async (_connection: ConnectionConfig, command: string[], _credentials?: RequestCredentials): Promise<RacResult> => {
         commands.push(command);
+        if (command[0] === "server" && command[1] === "list") {
+          return { records: [{ server: "44444444-4444-4444-8444-444444444444", name: "srv" }], elapsedMs: 1 };
+        }
         return { records: [{ cluster: "22222222-2222-4222-8222-222222222222", name: "Test" }], elapsedMs: 1 };
       },
     },
@@ -88,5 +92,31 @@ test("translates safe infobase registration lifecycle without dropping a databas
   assert.deepEqual(commands[2], ["infobase", "info", `--cluster=${clusterId}`, `--infobase=${infobaseId}`]);
   assert.deepEqual(commands[3], ["infobase", "drop", `--cluster=${clusterId}`, `--infobase=${infobaseId}`]);
   assert.ok(!commands.flat().includes("--drop-database"));
+});
+
+test("exposes capabilities, extended resources, details and working server settings", async (t) => {
+  const { server, commands, connection } = fixture();
+  server.listen(0, "127.0.0.1");
+  await new Promise<void>((resolve) => server.once("listening", resolve));
+  t.after(() => server.close());
+  const port = (server.address() as AddressInfo).port;
+  const clusterId = "22222222-2222-4222-8222-222222222222";
+  const serverId = "44444444-4444-4444-8444-444444444444";
+  const root = `http://127.0.0.1:${port}/api/connections/${connection.id}`;
+
+  const capabilities = await fetch(`${root}/capabilities`).then((response) => response.json()) as { modes: string[] };
+  assert.ok(capabilities.modes.includes("binary-data-storage"));
+  assert.equal((await fetch(`${root}/clusters/${clusterId}/rules`)).status, 200);
+  assert.equal((await fetch(`${root}/clusters/${clusterId}/servers/${serverId}`)).status, 200);
+  assert.equal((await fetch(`${root}/clusters/${clusterId}/servers/${serverId}/settings`, {
+    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ description: "Центральный", portRange: "2560:2591", mainServer: true }),
+  })).status, 200);
+
+  assert.deepEqual(commands[0], ["server", "list", `--cluster=${clusterId}`]);
+  assert.deepEqual(commands[1], ["rule", "list", `--cluster=${clusterId}`, `--server=${serverId}`]);
+  assert.deepEqual(commands[2], ["server", "info", `--cluster=${clusterId}`, `--server=${serverId}`]);
+  assert.ok(commands[3]?.includes("--descr=Центральный"));
+  assert.ok(commands[3]?.includes("--port-range=2560:2591"));
+  assert.ok(commands[3]?.includes("--main-server=yes"));
 });
 

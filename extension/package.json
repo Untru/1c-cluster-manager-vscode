@@ -35,6 +35,8 @@
       { "command": "onecClusterManager.setInfobaseCredentials", "title": "1C: Указать администратора информационной базы", "icon": "$(key)" },
       { "command": "onecClusterManager.setBackendToken", "title": "1C: Указать токен backend" },
       { "command": "onecClusterManager.openDetails", "title": "1C: Показать подробности" },
+      { "command": "onecClusterManager.openResource", "title": "1C: Открыть таблицу" },
+      { "command": "onecClusterManager.openClusterDetails", "title": "1C: Свойства кластера" },
       { "command": "onecClusterManager.openSessions", "title": "1C: Открыть список сеансов", "icon": "$(table)" },
       { "command": "onecClusterManager.openLocks", "title": "1C: Открыть таблицу блокировок", "icon": "$(table)" },
       { "command": "onecClusterManager.terminateSession", "title": "1C: Завершить сеанс" },

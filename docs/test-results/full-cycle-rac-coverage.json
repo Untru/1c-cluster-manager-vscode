@@ -1,0 +1,30 @@
+{
+  "startedAt": "2026-08-16T12:10:32.619Z",
+  "containerName": "onec-cluster-manager-e2e-55172-20260816121032",
+  "infobaseName": "codex_e2e_20260816121032",
+  "phases": [
+    {
+      "phase": "registered",
+      "infobaseId": "f93f9fea-f081-4444-bedd-b72a360cc7c3"
+    },
+    {
+      "phase": "blocked",
+      "sessionsDeny": "on",
+      "scheduledJobsDeny": "on",
+      "licenseDistribution": "deny"
+    },
+    {
+      "phase": "restored",
+      "sessionsDeny": "off",
+      "scheduledJobsDeny": "off",
+      "licenseDistribution": "allow"
+    },
+    {
+      "phase": "unregistered",
+      "registrationRemoved": true,
+      "physicalDatabasePreserved": true
+    }
+  ],
+  "status": "passed",
+  "finishedAt": "2026-08-16T12:10:42.247Z"
+}

@@ -1,0 +1,147 @@
+{
+  "status": "passed",
+  "generatedAt": "2026-08-16T12:11:24.481Z",
+  "matrix": [
+    {
+      "name": "1С 8.3.24",
+      "version": "8.3.24.1819",
+      "modes": [
+        "agent",
+        "cluster",
+        "manager",
+        "server",
+        "process",
+        "service",
+        "infobase",
+        "connection",
+        "session",
+        "lock",
+        "rule",
+        "profile",
+        "counter",
+        "limit"
+      ],
+      "clusters": [
+        {
+          "id": "a497404c-ded5-424b-890b-b81766b0521c",
+          "name": "Локальный кластер",
+          "resources": {
+            "infobases": 21,
+            "sessions": 0,
+            "connections": 3,
+            "locks": 5,
+            "servers": 1,
+            "processes": 1,
+            "managers": 1,
+            "services": 33,
+            "rules": 0,
+            "profiles": 0,
+            "counters": 0,
+            "limits": 0
+          },
+          "details": {
+            "cluster": 1,
+            "server": 1,
+            "process": 1
+          }
+        }
+      ]
+    },
+    {
+      "name": "1С 8.3.27",
+      "version": "8.3.27.2214",
+      "modes": [
+        "agent",
+        "cluster",
+        "manager",
+        "server",
+        "process",
+        "service",
+        "infobase",
+        "connection",
+        "session",
+        "lock",
+        "rule",
+        "profile",
+        "counter",
+        "limit",
+        "service-setting",
+        "binary-data-storage"
+      ],
+      "clusters": [
+        {
+          "id": "24c580ef-d5de-4b78-b204-b94b64eb2fae",
+          "name": "Локальный кластер",
+          "resources": {
+            "infobases": 6,
+            "sessions": 1,
+            "connections": 5,
+            "locks": 7,
+            "servers": 1,
+            "processes": 1,
+            "managers": 1,
+            "services": 35,
+            "rules": 0,
+            "profiles": 0,
+            "counters": 0,
+            "limits": 0,
+            "service-settings": 0
+          },
+          "details": {
+            "cluster": 1,
+            "server": 1,
+            "process": 1
+          }
+        }
+      ]
+    },
+    {
+      "name": "1С 8.5.1",
+      "version": "8.5.1.1150",
+      "modes": [
+        "agent",
+        "cluster",
+        "manager",
+        "server",
+        "process",
+        "service",
+        "infobase",
+        "connection",
+        "session",
+        "lock",
+        "rule",
+        "profile",
+        "counter",
+        "limit",
+        "service-setting",
+        "binary-data-storage"
+      ],
+      "clusters": [
+        {
+          "id": "550c0920-e1cd-4e72-9f8e-be66ed543676",
+          "name": "Локальный кластер",
+          "resources": {
+            "infobases": 24,
+            "sessions": 4,
+            "connections": 9,
+            "locks": 24,
+            "servers": 1,
+            "processes": 1,
+            "managers": 1,
+            "services": 35,
+            "rules": 0,
+            "profiles": 0,
+            "counters": 0,
+            "limits": 0,
+            "service-settings": 0
+          },
+          "details": {
+            "cluster": 1,
+            "server": 1,
+            "process": 1
+          }
+        }
+      ]
+    }
+  ]
+}
