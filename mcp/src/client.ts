@@ -27,6 +27,8 @@ export interface InfobaseControls {
   permissionCode?: string;
 }
 
+export type ClusterResource = "infobases" | "sessions" | "connections" | "locks" | "servers" | "processes" | "managers" | "services" | "rules" | "profiles" | "counters" | "limits" | "service-settings" | "binary-data-storages";
+
 export class BackendClient {
   private readonly baseUrl: string;
 
@@ -36,8 +38,13 @@ export class BackendClient {
 
   public listConnections(): Promise<unknown> { return this.request("/api/connections"); }
   public listClusters(connectionId: string): Promise<unknown> { return this.request(`/api/connections/${encodeURIComponent(connectionId)}/clusters`); }
-  public listResource(connectionId: string, clusterId: string, resource: "infobases" | "sessions" | "locks"): Promise<unknown> {
-    return this.request(`/api/connections/${encodeURIComponent(connectionId)}/clusters/${encodeURIComponent(clusterId)}/${resource}`);
+  public capabilities(connectionId: string): Promise<unknown> { return this.request(`/api/connections/${encodeURIComponent(connectionId)}/capabilities`); }
+  public listResource(connectionId: string, clusterId: string, resource: ClusterResource, filters: Record<string, string> = {}): Promise<unknown> {
+    const query = new URLSearchParams(filters).toString();
+    return this.request(`/api/connections/${encodeURIComponent(connectionId)}/clusters/${encodeURIComponent(clusterId)}/${resource}${query ? `?${query}` : ""}`);
+  }
+  public getResource(connectionId: string, clusterId: string, resource: ClusterResource, targetId: string): Promise<unknown> {
+    return this.request(`/api/connections/${encodeURIComponent(connectionId)}/clusters/${encodeURIComponent(clusterId)}/${resource}/${encodeURIComponent(targetId)}`);
   }
   public registerInfobase(connectionId: string, clusterId: string, input: RegistrationInput): Promise<unknown> {
     return this.request(`/api/connections/${encodeURIComponent(connectionId)}/clusters/${encodeURIComponent(clusterId)}/infobases`, "POST", input);
@@ -53,6 +60,9 @@ export class BackendClient {
   }
   public terminateSession(connectionId: string, clusterId: string, sessionId: string, message: string): Promise<unknown> {
     return this.request(`/api/connections/${encodeURIComponent(connectionId)}/clusters/${encodeURIComponent(clusterId)}/sessions/${encodeURIComponent(sessionId)}/terminate`, "POST", { message });
+  }
+  public action(connectionId: string, clusterId: string, resource: ClusterResource, targetId: string, action: string, body: Record<string, unknown> = {}): Promise<unknown> {
+    return this.request(`/api/connections/${encodeURIComponent(connectionId)}/clusters/${encodeURIComponent(clusterId)}/${resource}/${encodeURIComponent(targetId)}/${encodeURIComponent(action)}`, "POST", body);
   }
 
   private async request(path: string, method = "GET", body?: unknown): Promise<unknown> {

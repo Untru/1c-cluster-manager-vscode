@@ -1,8 +1,9 @@
 import { randomBytes } from "node:crypto";
 import * as vscode from "vscode";
 import { ApiClient } from "./api";
-import type { RacRecord } from "./model";
+import type { RacRecord, ResourceType } from "./model";
 import { recordId } from "./presentation";
+import { resourceLabel } from "./presentation";
 import type { ClusterNode, ClusterTreeProvider } from "./tree";
 
 function escapeHtml(value: unknown): string {
@@ -194,13 +195,13 @@ export async function showSessions(
   let processes: RacRecord[] = [];
   const load = async (): Promise<void> => {
     [sessions, bases, processes] = await Promise.all([
-      api.resources(node.connectionId!, node.clusterId!, "sessions").then((value) => value.records),
+      api.resources(node.connectionId!, node.clusterId!, "sessions", node.infobaseId ? { infobase: node.infobaseId } : {}).then((value) => value.records),
       api.resources(node.connectionId!, node.clusterId!, "infobases").then((value) => value.records),
       api.resources(node.connectionId!, node.clusterId!, "processes").then((value) => value.records),
     ]);
   };
   await load();
-  const panel = vscode.window.createWebviewPanel("onecSessions", "1С: Сеансы", vscode.ViewColumn.Active, { enableScripts: true, retainContextWhenHidden: true });
+  const panel = vscode.window.createWebviewPanel("onecSessions", node.infobaseId ? "1С: Сеансы информационной базы" : "1С: Сеансы", vscode.ViewColumn.Active, { enableScripts: true, retainContextWhenHidden: true });
   panel.webview.html = sessionsHtml(panel.webview, sessions, bases, processes);
   context.subscriptions.push(panel);
   const refresh = async (): Promise<void> => { await load(); panel.webview.html = sessionsHtml(panel.webview, sessions, bases, processes); tree.refresh(node); };
@@ -243,7 +244,7 @@ export async function showLocks(
   let processes: RacRecord[] = [];
   const load = async (): Promise<void> => {
     [locks, bases, sessions, connections, processes] = await Promise.all([
-      api.resources(node.connectionId!, node.clusterId!, "locks").then((value) => value.records),
+      api.resources(node.connectionId!, node.clusterId!, "locks", node.infobaseId ? { infobase: node.infobaseId } : {}).then((value) => value.records),
       api.resources(node.connectionId!, node.clusterId!, "infobases").then((value) => value.records),
       api.resources(node.connectionId!, node.clusterId!, "sessions").then((value) => value.records),
       api.resources(node.connectionId!, node.clusterId!, "connections").then((value) => value.records),
@@ -251,7 +252,7 @@ export async function showLocks(
     ]);
   };
   await load();
-  const panel = vscode.window.createWebviewPanel("onecLocks", "1С: Блокировки", vscode.ViewColumn.Active, { enableScripts: true, retainContextWhenHidden: true });
+  const panel = vscode.window.createWebviewPanel("onecLocks", node.infobaseId ? "1С: Блокировки информационной базы" : "1С: Блокировки", vscode.ViewColumn.Active, { enableScripts: true, retainContextWhenHidden: true });
   panel.webview.html = locksHtml(panel.webview, locks, bases, sessions, connections, processes);
   context.subscriptions.push(panel);
   const refresh = async (): Promise<void> => {
@@ -259,7 +260,7 @@ export async function showLocks(
     panel.webview.html = locksHtml(panel.webview, locks, bases, sessions, connections, processes);
     tree.refresh(node);
   };
-  panel.webview.onDidReceiveMessage(async (message: { command?: string }) => {
+  panel.webview.onDidReceiveMessage(async (message: { command?: string; data?: Record<string, unknown> }) => {
     try {
       if (message.command === "refresh") await refresh();
       if (message.command === "export") {
@@ -268,6 +269,106 @@ export async function showLocks(
         const columns = ["descr", "connection", "session", "object", "locked"];
         const csv = [columns, ...locks.map((item) => columns.map((column) => item[column] ?? ""))].map((row) => row.map((cell) => `"${cell.replaceAll('"', '""')}"`).join(";")).join("\r\n");
         await vscode.workspace.fs.writeFile(target, Buffer.from(`\uFEFF${csv}`, "utf8"));
+      }
+    } catch (error) { void vscode.window.showErrorMessage(`1C Cluster Manager: ${(error as Error).message}`); }
+  }, undefined, context.subscriptions);
+}
+
+function genericTableHtml(resource: ResourceType, records: RacRecord[]): string {
+  const scriptNonce = nonce();
+  const columns = [...new Set(records.flatMap((record) => Object.keys(record)))];
+  const rows = records.map((record) => `<tr data-search="${escapeHtml(Object.values(record).join(" ").toLowerCase())}">${columns.map((column) => `<td>${escapeHtml(record[column])}</td>`).join("")}</tr>`).join("");
+  return `<!doctype html><html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${scriptNonce}'"><style>${baseStyles()}
+    body{padding:14px}.toolbar{position:sticky;top:0;z-index:2;background:var(--vscode-editor-background);padding-bottom:10px;margin:0}.toolbar h1{font-size:17px}.search{max-width:620px}.count{color:var(--vscode-descriptionForeground)}.table-wrap{overflow:auto;border:1px solid var(--vscode-panel-border)}table{border-collapse:collapse;min-width:100%;width:max-content}th,td{border-right:1px solid var(--vscode-panel-border);border-bottom:1px solid var(--vscode-panel-border);padding:7px 8px;text-align:left;white-space:nowrap}th{position:sticky;top:0;background:var(--vscode-editor-background)}tr:hover td{background:var(--vscode-list-hoverBackground)}
+    </style></head><body><div class="toolbar"><h1>${escapeHtml(resourceLabel(resource))}</h1><input id="search" class="search" placeholder="Поиск"><span id="count" class="count">${records.length} записей</span><button class="secondary" id="export">Экспорт CSV</button><button id="refresh">Обновить</button></div>
+    ${records.length ? `<div class="table-wrap"><table><thead><tr>${columns.map((column) => `<th>${escapeHtml(column)}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table></div>` : `<div class="empty">Данных нет</div>`}
+    <script nonce="${scriptNonce}">const vscode=acquireVsCodeApi(),rows=[...document.querySelectorAll('tbody tr')],search=document.getElementById('search'),count=document.getElementById('count');search.addEventListener('input',()=>{const q=search.value.trim().toLowerCase();let n=0;rows.forEach(r=>{const show=!q||r.dataset.search.includes(q);r.hidden=!show;if(show)n++});count.textContent=n+' записей'});document.getElementById('refresh').addEventListener('click',()=>vscode.postMessage({command:'refresh'}));document.getElementById('export').addEventListener('click',()=>vscode.postMessage({command:'export'}));</script></body></html>`;
+}
+
+function detailsHtml(title: string, record: RacRecord): string {
+  const scriptNonce = nonce();
+  const fields = Object.entries(record).map(([key, value]) => `<div class="field"><label>${escapeHtml(key)}</label><input readonly value="${escapeHtml(value)}"></div>`).join("");
+  return `<!doctype html><html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${scriptNonce}'"><style>${baseStyles()}.grid{display:grid;grid-template-columns:repeat(2,minmax(260px,1fr));gap:14px 20px;max-width:1300px;margin:auto}@media(max-width:760px){.grid{grid-template-columns:1fr}}</style></head><body><div class="toolbar"><h1>${escapeHtml(title)}</h1><button id="refresh">Обновить</button></div><div class="grid">${fields}</div><script nonce="${scriptNonce}">const vscode=acquireVsCodeApi();document.getElementById('refresh').addEventListener('click',()=>vscode.postMessage({command:'refresh'}));</script></body></html>`;
+}
+
+function serverHtml(title: string, record: RacRecord): string {
+  const scriptNonce = nonce();
+  const value = (key: string): string => escapeHtml(record[key]);
+  const input = (label: string, name: string, key: string, suffix = "") => `<div class="field"><label>${label}</label><div class="unit"><input name="${name}" value="${value(key)}">${suffix ? `<span>${suffix}</span>` : ""}</div></div>`;
+  return `<!doctype html><html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${scriptNonce}'"><style>${baseStyles()}form{max-width:1300px;margin:auto}.grid{display:grid;grid-template-columns:repeat(2,minmax(260px,1fr));gap:14px 20px}.unit{display:flex;align-items:center}.unit span{margin-left:-52px;color:var(--vscode-descriptionForeground);pointer-events:none}.actions{display:flex;justify-content:flex-end;margin-top:18px}@media(max-width:760px){.grid{grid-template-columns:1fr}}</style></head><body><form id="server"><div class="toolbar"><h1>${escapeHtml(title)}</h1><button class="secondary" id="refresh" type="button">Обновить</button></div><div class="grid">
+    ${input("Описание сервера", "description", "descr")}<div class="field"><label>Компьютер</label><input readonly value="${value("agent-host") || value("name")}"></div>
+    <div class="field"><label>IP порт</label><input readonly value="${value("agent-port")}"></div>${input("Диапазоны IP портов", "portRange", "port-range")}
+    ${input("Безопасный расход памяти за один вызов", "safeCallMemoryLimit", "safe-call-memory-limit", "Мб")}${input("Критический объём памяти процессов", "criticalTotalMemory", "critical-total-memory", "Мб")}
+    ${input("Временно допустимый объём памяти процессов", "temporaryAllowedTotalMemory", "temporary-allowed-total-memory", "Мб")}${input("Интервал превышения допустимого объёма памяти", "temporaryAllowedTotalMemoryTimeLimit", "temporary-allowed-total-memory-time-limit", "сек")}
+    ${input("Количество ИБ на процесс", "infobasesLimit", "infobases-limit")}${input("Количество соединений на процесс", "connectionsLimit", "connections-limit")}
+    <label class="check"><input name="dedicatedManagers" type="checkbox"${checked(yes(record["dedicated-managers"]))}>Менеджер под каждый сервис</label><label class="check"><input name="mainServer" type="checkbox"${checked(yes(record["main-server"]))}>Центральный сервер</label>
+    </div><div class="actions"><button type="submit">Сохранить</button></div></form><script nonce="${scriptNonce}">const vscode=acquireVsCodeApi(),form=document.getElementById('server');document.getElementById('refresh').addEventListener('click',()=>vscode.postMessage({command:'refresh'}));form.addEventListener('submit',event=>{event.preventDefault();const data=Object.fromEntries(new FormData(form));data.dedicatedManagers=form.elements.dedicatedManagers.checked;data.mainServer=form.elements.mainServer.checked;vscode.postMessage({command:'save',data})});</script></body></html>`;
+}
+
+export async function showResourceTable(context: vscode.ExtensionContext, api: ApiClient, tree: ClusterTreeProvider, node: ClusterNode): Promise<void> {
+  if (!node.connectionId || !node.clusterId || !node.resource) return;
+  if (node.resource === "sessions") return showSessions(context, api, tree, node);
+  if (node.resource === "locks") return showLocks(context, api, tree, node);
+  let records: RacRecord[] = [];
+  const load = async (): Promise<void> => {
+    const filters = { ...(node.infobaseId ? { infobase: node.infobaseId } : {}), ...(node.serverId ? { server: node.serverId } : {}) };
+    records = (await api.resources(node.connectionId!, node.clusterId!, node.resource!, filters)).records;
+  };
+  await load();
+  const panel = vscode.window.createWebviewPanel("onecResourceTable", `1С: ${resourceLabel(node.resource)}`, vscode.ViewColumn.Active, { enableScripts: true, retainContextWhenHidden: true });
+  panel.webview.html = genericTableHtml(node.resource, records);
+  context.subscriptions.push(panel);
+  panel.webview.onDidReceiveMessage(async (message: { command?: string }) => {
+    try {
+      if (message.command === "refresh") { await load(); panel.webview.html = genericTableHtml(node.resource!, records); tree.refresh(node); }
+      if (message.command === "export") {
+        const target = await vscode.window.showSaveDialog({ defaultUri: vscode.Uri.file(`${node.resource}-${new Date().toISOString().slice(0, 10)}.csv`), filters: { CSV: ["csv"] } });
+        if (!target) return;
+        const columns = [...new Set(records.flatMap((record) => Object.keys(record)))];
+        const csv = [columns, ...records.map((item) => columns.map((column) => item[column] ?? ""))].map((row) => row.map((cell) => `"${cell.replaceAll('"', '""')}"`).join(";")).join("\r\n");
+        await vscode.workspace.fs.writeFile(target, Buffer.from(`\uFEFF${csv}`, "utf8"));
+      }
+    } catch (error) { void vscode.window.showErrorMessage(`1C Cluster Manager: ${(error as Error).message}`); }
+  }, undefined, context.subscriptions);
+}
+
+export async function showRecordDetails(context: vscode.ExtensionContext, api: ApiClient, node: ClusterNode): Promise<void> {
+  if (!node.connectionId || !node.clusterId || !node.resource || !node.record) return;
+  let record = node.record;
+  const load = async (): Promise<void> => {
+    if (["locks", "connections", "sessions"].includes(node.resource!)) return;
+    record = (await api.resourceDetails(node.connectionId!, node.clusterId!, node.resource!, recordId(node.resource!, node.record!), node.infobaseId)).records[0] ?? record;
+  };
+  await load();
+  const panel = vscode.window.createWebviewPanel("onecRecordDetails", `1С: ${node.label}`, vscode.ViewColumn.Active, { enableScripts: true, retainContextWhenHidden: true });
+  const render = (): string => node.resource === "servers" ? serverHtml(`Рабочий сервер — ${String(node.label)}`, record) : detailsHtml(String(node.label), record);
+  panel.webview.html = render();
+  context.subscriptions.push(panel);
+  panel.webview.onDidReceiveMessage(async (message: { command?: string; data?: Record<string, unknown> }) => {
+    try {
+      if (message.command === "refresh") { await load(); panel.webview.html = render(); }
+      if (message.command === "save" && message.data && node.resource === "servers") {
+        await api.action(node.connectionId!, node.clusterId!, "servers", recordId("servers", node.record!), "settings", message.data);
+        await load(); panel.webview.html = render();
+        void vscode.window.showInformationMessage("Свойства рабочего сервера сохранены");
+      }
+    }
+    catch (error) { void vscode.window.showErrorMessage(`1C Cluster Manager: ${(error as Error).message}`); }
+  }, undefined, context.subscriptions);
+}
+
+export async function showClusterDetails(context: vscode.ExtensionContext, api: ApiClient, node: ClusterNode): Promise<void> {
+  if (!node.connectionId || !node.clusterId) return;
+  let record = (await api.clusterDetails(node.connectionId, node.clusterId)).records[0] ?? node.record ?? {};
+  const panel = vscode.window.createWebviewPanel("onecClusterDetails", `1С: ${node.label}`, vscode.ViewColumn.Active, { enableScripts: true, retainContextWhenHidden: true });
+  panel.webview.html = detailsHtml(`Кластер — ${String(node.label)}`, record);
+  context.subscriptions.push(panel);
+  panel.webview.onDidReceiveMessage(async (message: { command?: string }) => {
+    try {
+      if (message.command === "refresh") {
+        record = (await api.clusterDetails(node.connectionId!, node.clusterId!)).records[0] ?? record;
+        panel.webview.html = detailsHtml(`Кластер — ${String(node.label)}`, record);
       }
     } catch (error) { void vscode.window.showErrorMessage(`1C Cluster Manager: ${(error as Error).message}`); }
   }, undefined, context.subscriptions);

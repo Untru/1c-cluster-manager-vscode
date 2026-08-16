@@ -4,6 +4,7 @@ import { BackendClient } from "./client";
 
 const id = z.string().uuid();
 const location = { connectionId: id.describe("UUID подключения RAS"), clusterId: id.describe("UUID кластера 1С") };
+const resources = ["infobases", "sessions", "connections", "locks", "servers", "processes", "managers", "services", "rules", "profiles", "counters", "limits", "service-settings", "binary-data-storages"] as const;
 
 function result(value: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }] };
@@ -11,16 +12,29 @@ function result(value: unknown) {
 
 export function createMcpServer(client: BackendClient): McpServer {
   const server = new McpServer(
-    { name: "onec-cluster-manager", version: "0.1.0" },
+    { name: "onec-cluster-manager", version: "0.1.1" },
     { instructions: "Сначала получите подключения и кластеры. Перед изменением или удалением информационной базы повторно получите её список и сверяйте UUID. Удаление снимает только регистрацию из кластера и никогда не удаляет физическую базу данных." },
   );
 
   server.registerTool("connections_list", { description: "Список настроенных подключений к RAS" }, async () => result(await client.listConnections()));
+  server.registerTool("rac_capabilities_get", { description: "Версия, путь и фактически поддерживаемые режимы выбранного rac", inputSchema: z.object({ connectionId: location.connectionId }) }, async ({ connectionId }) => result(await client.capabilities(connectionId)));
   server.registerTool("clusters_list", { description: "Список кластеров подключения", inputSchema: z.object({ connectionId: location.connectionId }) }, async ({ connectionId }) => result(await client.listClusters(connectionId)));
   server.registerTool("infobases_list", { description: "Список информационных баз кластера", inputSchema: z.object(location) }, async (input) => result(await client.listResource(input.connectionId, input.clusterId, "infobases")));
   server.registerTool("infobase_get", { description: "Полные свойства информационной базы, включая блокировки и режим выдачи лицензий", inputSchema: z.object({ ...location, infobaseId: id }) }, async (input) => result(await client.getInfobase(input.connectionId, input.clusterId, input.infobaseId)));
   server.registerTool("sessions_list", { description: "Список сеансов кластера", inputSchema: z.object(location) }, async (input) => result(await client.listResource(input.connectionId, input.clusterId, "sessions")));
   server.registerTool("locks_list", { description: "Список блокировок кластера", inputSchema: z.object(location) }, async (input) => result(await client.listResource(input.connectionId, input.clusterId, "locks")));
+  server.registerTool("cluster_resource_list", {
+    description: "Список любой поддерживаемой сущности кластера. Перед вызовом проверьте rac_capabilities_get.",
+    inputSchema: z.object({ ...location, resource: z.enum(resources), infobaseId: id.optional(), serverId: id.optional() }),
+  }, async ({ connectionId, clusterId, resource, infobaseId, serverId }) => result(await client.listResource(connectionId, clusterId, resource, { ...(infobaseId ? { infobase: infobaseId } : {}), ...(serverId ? { server: serverId } : {}) })));
+  server.registerTool("cluster_resource_get", {
+    description: "Полные свойства сущности кластера через соответствующую команду rac info",
+    inputSchema: z.object({ ...location, resource: z.enum(["infobases", "servers", "processes", "managers", "services", "rules", "profiles", "counters", "limits", "service-settings", "binary-data-storages"]), targetId: id }),
+  }, async ({ connectionId, clusterId, resource, targetId }) => result(await client.getResource(connectionId, clusterId, resource, targetId)));
+  server.registerTool("infobase_activity_list", {
+    description: "Сеансы, соединения или блокировки одной информационной базы",
+    inputSchema: z.object({ ...location, infobaseId: id, resource: z.enum(["sessions", "connections", "locks"]) }),
+  }, async ({ connectionId, clusterId, infobaseId, resource }) => result(await client.listResource(connectionId, clusterId, resource, { infobase: infobaseId })));
 
   server.registerTool("infobase_register", {
     description: "Зарегистрировать информационную базу в кластере. createDatabase по умолчанию false: физическая БД не создаётся.",
@@ -60,6 +74,19 @@ export function createMcpServer(client: BackendClient): McpServer {
     description: "Принудительно завершить сеанс 1С",
     inputSchema: z.object({ ...location, sessionId: id, message: z.string().min(1).max(500).default("Сеанс завершён администратором") }),
   }, async ({ connectionId, clusterId, sessionId, message }) => result(await client.terminateSession(connectionId, clusterId, sessionId, message)));
+
+  server.registerTool("session_interrupt", {
+    description: "Прервать текущий серверный вызов, не завершая сеанс",
+    inputSchema: z.object({ ...location, sessionId: id, confirmation: z.literal("INTERRUPT") }),
+  }, async ({ connectionId, clusterId, sessionId }) => result(await client.action(connectionId, clusterId, "sessions", sessionId, "interrupt")));
+  server.registerTool("connection_disconnect", {
+    description: "Принудительно разорвать соединение 1С",
+    inputSchema: z.object({ ...location, connectionId1c: id, processId: id, confirmation: z.literal("DISCONNECT") }),
+  }, async ({ connectionId, clusterId, connectionId1c, processId }) => result(await client.action(connectionId, clusterId, "connections", connectionId1c, "disconnect", { processId })));
+  server.registerTool("process_turn_off", {
+    description: "Выключить рабочий процесс кластера",
+    inputSchema: z.object({ ...location, processId: id, confirmation: z.literal("TURN_OFF") }),
+  }, async ({ connectionId, clusterId, processId }) => result(await client.action(connectionId, clusterId, "processes", processId, "turn-off")));
 
   return server;
 }

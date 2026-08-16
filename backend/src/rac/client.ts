@@ -3,6 +3,7 @@ import { HttpError } from "../errors";
 import type { ConnectionConfig, RacResult, RequestCredentials } from "../types";
 import { discoverRac } from "./discovery";
 import { parseRacOutput } from "./parser";
+import { parseRacCapabilities, type RacCapabilities } from "./capabilities";
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 const MAX_OUTPUT_BYTES = 10 * 1024 * 1024;
@@ -38,6 +39,17 @@ export function credentialArgs(credentials: RequestCredentials, includeInfobase 
 }
 
 export class RacClient {
+  private readonly capabilityCache = new Map<string, Promise<RacCapabilities>>();
+
+  public async capabilities(connection: ConnectionConfig): Promise<RacCapabilities> {
+    const racPath = await discoverRac(connection.racPath);
+    const cached = this.capabilityCache.get(racPath);
+    if (cached) return cached;
+    const loading = this.run(racPath, ["help"]).then((help) => parseRacCapabilities(racPath, help));
+    this.capabilityCache.set(racPath, loading);
+    try { return await loading; } catch (error) { this.capabilityCache.delete(racPath); throw error; }
+  }
+
   public async execute(
     connection: ConnectionConfig,
     command: string[],

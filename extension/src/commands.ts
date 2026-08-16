@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { ApiClient } from "./api";
-import { recordId } from "./presentation";
-import { showInfobaseProperties, showLocks, showSessions } from "./panels";
+import { recordId, recordLabel } from "./presentation";
+import { showClusterDetails, showInfobaseProperties, showLocks, showRecordDetails, showResourceTable, showSessions } from "./panels";
 import { SecretRepository } from "./secrets";
 import { ClusterNode, ClusterTreeProvider } from "./tree";
 
@@ -110,9 +110,14 @@ export function registerCommands(
       await showInfobaseProperties(context, api, tree, node);
       return;
     }
-    let record = node.record ?? {};
-    const document = await vscode.workspace.openTextDocument({ language: "json", content: `${JSON.stringify(record, null, 2)}\n` });
-    await vscode.window.showTextDocument(document, { preview: true });
+    await showRecordDetails(context, api, node);
+  });
+
+  command("onecClusterManager.openResource", async (node: ClusterNode) => {
+    await showResourceTable(context, api, tree, node);
+  });
+  command("onecClusterManager.openClusterDetails", async (node: ClusterNode) => {
+    await showClusterDetails(context, api, node);
   });
 
   command("onecClusterManager.openSessions", async (node: ClusterNode) => {
@@ -146,4 +151,32 @@ export function registerCommands(
   command("onecClusterManager.disableScheduledJobsLock", (node: ClusterNode) => runRecordAction(node, "settings", { scheduledJobsDeny: false }, "Разрешить регламентные задания?"));
   command("onecClusterManager.denyLicenseDistribution", (node: ClusterNode) => runRecordAction(node, "settings", { licenseDistribution: "deny" }, "Запретить выдачу лицензий сервером 1С для этой базы?"));
   command("onecClusterManager.allowLicenseDistribution", (node: ClusterNode) => runRecordAction(node, "settings", { licenseDistribution: "allow" }, "Разрешить выдачу лицензий сервером 1С для этой базы?"));
+
+  if (context.extensionMode !== vscode.ExtensionMode.Production) {
+    command("onecClusterManager.test.openResource", async (resourceName: string, scoped = false) => {
+      const resource = resourceName as import("./model").ResourceType;
+      const connections = await api.listConnections();
+      const connection = connections[Math.min(1, connections.length - 1)];
+      if (!connection) throw new Error("Нет тестового подключения");
+      const cluster = (await api.clusters(connection.id)).records[0];
+      if (!cluster?.cluster) throw new Error("Кластер не найден");
+      let infobaseId: string | undefined;
+      if (scoped) infobaseId = (await api.resources(connection.id, cluster.cluster, "infobases")).records[0]?.infobase;
+      const node = new ClusterNode("resource", resource, vscode.TreeItemCollapsibleState.Collapsed, connection.id, cluster.cluster, resource, undefined, infobaseId);
+      await showResourceTable(context, api, tree, node);
+    });
+    command("onecClusterManager.test.openRecord", async (resourceName: string) => {
+      const resource = resourceName as import("./model").ResourceType;
+      const connections = await api.listConnections();
+      const connection = connections[Math.min(1, connections.length - 1)];
+      if (!connection) throw new Error("Нет тестового подключения");
+      const cluster = (await api.clusters(connection.id)).records[0];
+      const records = cluster?.cluster ? (await api.resources(connection.id, cluster.cluster, resource)).records : [];
+      const record = resource === "infobases" ? records.find((item) => item.name === "BER_710") ?? records[0] : records[0];
+      if (!cluster?.cluster || !record) throw new Error(`Запись ${resource} не найдена`);
+      const node = new ClusterNode("record", recordLabel(resource, record), vscode.TreeItemCollapsibleState.None, connection.id, cluster.cluster, resource, record);
+      if (resource === "infobases") await showInfobaseProperties(context, api, tree, node);
+      else await showRecordDetails(context, api, node);
+    });
+  }
 }

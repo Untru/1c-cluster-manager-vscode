@@ -15,6 +15,22 @@ const RESOURCE_COMMANDS: Record<string, string[]> = {
   processes: ["process", "list"],
   managers: ["manager", "list"],
   services: ["service", "list"],
+  rules: ["rule", "list"],
+  profiles: ["profile", "list"],
+  counters: ["counter", "list"],
+  limits: ["limit", "list"],
+  "service-settings": ["service-setting", "list"],
+  "binary-data-storages": ["binary-data-storage", "list"],
+};
+
+const RESOURCE_MODES: Record<string, string> = Object.fromEntries(
+  Object.entries(RESOURCE_COMMANDS).map(([resource, command]) => [resource, command[0]]),
+);
+
+const INFO_COMMANDS: Record<string, string> = {
+  infobases: "infobase", servers: "server", processes: "process", managers: "manager",
+  services: "service", rules: "rule", profiles: "profile", counters: "counter", limits: "limit",
+  "service-settings": "service-setting", "binary-data-storages": "binary-data-storage",
 };
 
 function sendJson(response: ServerResponse, status: number, payload: unknown): void {
@@ -108,7 +124,7 @@ function authorize(request: IncomingMessage, token?: string): void {
 
 export interface BackendDependencies {
   repository: Pick<ConfigRepository, "list" | "get" | "add" | "remove">;
-  rac: Pick<RacClient, "execute">;
+  rac: Pick<RacClient, "execute" | "capabilities">;
   token?: string;
 }
 
@@ -121,7 +137,7 @@ export function createBackendServer(dependencies: BackendDependencies): Server {
       const segments = url.pathname.split("/").filter(Boolean).map(decodeURIComponent);
 
       if (method === "GET" && url.pathname === "/health") {
-        sendJson(response, 200, { status: "ok", version: "0.1.0" });
+        sendJson(response, 200, { status: "ok", version: "0.1.1" });
         return;
       }
 
@@ -145,6 +161,11 @@ export function createBackendServer(dependencies: BackendDependencies): Server {
       const connectionId = requireUuid(segments[2], "connectionId");
       const connection = await dependencies.repository.get(connectionId);
 
+      if (segments.length === 4 && segments[3] === "capabilities" && method === "GET") {
+        sendJson(response, 200, await dependencies.rac.capabilities(connection));
+        return;
+      }
+
       if (segments.length === 3 && method === "DELETE") {
         await dependencies.repository.remove(connectionId);
         response.writeHead(204).end();
@@ -161,6 +182,11 @@ export function createBackendServer(dependencies: BackendDependencies): Server {
 
       const clusterId = requireUuid(segments[4], "clusterId");
       const resource = segments[5];
+
+      if (segments.length === 5 && method === "GET") {
+        sendJson(response, 200, await dependencies.rac.execute(connection, ["cluster", "info", `--cluster=${clusterId}`], credentials));
+        return;
+      }
 
       if (segments.length === 6 && resource === "infobases" && method === "POST") {
         const body = await readJson(request);
@@ -183,6 +209,10 @@ export function createBackendServer(dependencies: BackendDependencies): Server {
       }
 
       if (segments.length === 6 && method === "GET" && RESOURCE_COMMANDS[resource]) {
+        const capabilities = await dependencies.rac.capabilities(connection);
+        if (!capabilities.modes.includes(RESOURCE_MODES[resource])) {
+          throw new HttpError(404, `rac ${capabilities.version ?? ""} does not support ${RESOURCE_MODES[resource]}`.trim(), { code: "RAC_CAPABILITY_UNAVAILABLE" });
+        }
         const filters = [
           ...optionalUuidQuery(url, "infobase"),
           ...optionalUuidQuery(url, "session"),
@@ -190,6 +220,22 @@ export function createBackendServer(dependencies: BackendDependencies): Server {
           ...optionalUuidQuery(url, "process"),
           ...optionalUuidQuery(url, "server"),
         ];
+        const scopedParent = ({
+          rules: { collection: "servers", id: "server", command: ["server", "list"] },
+          "service-settings": { collection: "servers", id: "server", command: ["server", "list"] },
+          "binary-data-storages": { collection: "infobases", id: "infobase", command: ["infobase", "summary", "list"] },
+        } as Record<string, { collection: string; id: string; command: string[] }>)[resource];
+        if (scopedParent && !url.searchParams.get(scopedParent.id)) {
+          const parents = await dependencies.rac.execute(connection, [...scopedParent.command, `--cluster=${clusterId}`], credentials);
+          const results = await Promise.all(parents.records.map(async (parent) => {
+            const parentId = parent[scopedParent.id];
+            if (!parentId || !UUID_PATTERN.test(parentId)) return { records: [], elapsedMs: 0 };
+            const value = await dependencies.rac.execute(connection, [...RESOURCE_COMMANDS[resource], `--cluster=${clusterId}`, `--${scopedParent.id}=${parentId}`], credentials, resource === "binary-data-storages");
+            return { ...value, records: value.records.map((record) => ({ [scopedParent.id]: parentId, ...record })) };
+          }));
+          sendJson(response, 200, { records: results.flatMap((value) => value.records), elapsedMs: results.reduce((total, value) => total + value.elapsedMs, parents.elapsedMs) });
+          return;
+        }
         const command = [...RESOURCE_COMMANDS[resource], `--cluster=${clusterId}`, ...filters];
         sendJson(response, 200, await dependencies.rac.execute(connection, command, credentials, resource === "connections"));
         return;
@@ -199,6 +245,11 @@ export function createBackendServer(dependencies: BackendDependencies): Server {
       const action = segments[7];
       if (method === "GET" && resource === "infobases" && targetId && segments.length === 7) {
         sendJson(response, 200, await dependencies.rac.execute(connection, ["infobase", "info", `--cluster=${clusterId}`, `--infobase=${targetId}`], credentials, true));
+        return;
+      }
+      if (method === "GET" && targetId && INFO_COMMANDS[resource] && segments.length === 7) {
+        const singular = INFO_COMMANDS[resource];
+        sendJson(response, 200, await dependencies.rac.execute(connection, [singular, "info", `--cluster=${clusterId}`, `--${singular}=${targetId}`], credentials, resource === "connections"));
         return;
       }
       if (method === "DELETE" && resource === "infobases" && targetId && segments.length === 7) {
@@ -222,6 +273,21 @@ export function createBackendServer(dependencies: BackendDependencies): Server {
           includeInfobaseCredentials = true;
         } else if (resource === "processes" && action === "turn-off") {
           command = ["process", "turn-off", `--cluster=${clusterId}`, `--process=${targetId}`];
+        } else if (resource === "servers" && action === "settings") {
+          command = ["server", "update", `--cluster=${clusterId}`, `--server=${targetId}`];
+          for (const [bodyName, optionName, maxLength] of [
+            ["description", "descr", 500],
+            ["portRange", "port-range", 100],
+            ["safeCallMemoryLimit", "safe-call-memory-limit", 30],
+            ["criticalTotalMemory", "critical-total-memory", 30],
+            ["temporaryAllowedTotalMemory", "temporary-allowed-total-memory", 30],
+            ["temporaryAllowedTotalMemoryTimeLimit", "temporary-allowed-total-memory-time-limit", 30],
+            ["infobasesLimit", "infobases-limit", 30],
+            ["connectionsLimit", "connections-limit", 30],
+          ] as const) appendUpdateOption(command, body, bodyName, optionName, maxLength);
+          if (typeof body.dedicatedManagers === "boolean") command.push(`--dedicated-managers=${body.dedicatedManagers ? "on" : "off"}`);
+          if (typeof body.mainServer === "boolean") command.push(`--main-server=${body.mainServer ? "yes" : "no"}`);
+          if (command.length === 4) throw new HttpError(400, "At least one working server setting must be provided");
         } else if (resource === "infobases" && action === "settings") {
           command = ["infobase", "update", `--cluster=${clusterId}`, `--infobase=${targetId}`];
           includeInfobaseCredentials = true;

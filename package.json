@@ -1,6 +1,6 @@
 {
   "name": "onec-cluster-manager-vscode",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "workspaces": [
     "backend",
@@ -12,7 +12,9 @@
     "test": "npm run test --workspace @onec-cluster-manager/backend && npm run test --workspace onec-cluster-manager && npm run test --workspace @onec-cluster-manager/mcp",
     "check": "npm run build && npm test",
     "test:e2e": "npm run build && node scripts/e2e-full-cycle.js",
-    "test:visual:launch": "npm run build && node scripts/launch-visual-test.js"
+    "test:visual:launch": "npm run build && node scripts/launch-visual-test.js",
+    "test:visual:capture": "npm run build && node scripts/launch-visual-test.js",
+    "test:matrix": "npm run build && node scripts/read-only-matrix.js"
   },
   "devDependencies": {
     "@vscode/test-electron": "^3.1.0",
