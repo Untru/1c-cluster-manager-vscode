@@ -52,6 +52,10 @@ export class BackendManager implements vscode.Disposable {
   }
 
   public dispose(): void {
-    this.process?.kill();
+    if (!this.process) return;
+    this.process.send?.({ type: "shutdown" });
+    const child = this.process;
+    setTimeout(() => { if (child.exitCode === null) child.kill(); }, 1_500).unref();
+    this.process = undefined;
   }
 }

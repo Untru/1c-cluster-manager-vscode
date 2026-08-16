@@ -14,6 +14,7 @@
   "main": "./out/extension.js",
   "activationEvents": [
     "onView:onecClusters",
+    "onView:onecRas",
     "onCommand:onecClusterManager.addConnection"
   ],
   "scripts": {
@@ -42,7 +43,14 @@
       { "command": "onecClusterManager.enableSessionLock", "title": "1C: Заблокировать начало сеансов" },
       { "command": "onecClusterManager.disableSessionLock", "title": "1C: Разрешить начало сеансов" },
       { "command": "onecClusterManager.enableScheduledJobsLock", "title": "1C: Заблокировать регламентные задания" },
-      { "command": "onecClusterManager.disableScheduledJobsLock", "title": "1C: Разрешить регламентные задания" }
+      { "command": "onecClusterManager.disableScheduledJobsLock", "title": "1C: Разрешить регламентные задания" },
+      { "command": "onecClusterManager.rasRefresh", "title": "1C: Обновить RAS", "icon": "$(refresh)" },
+      { "command": "onecClusterManager.startRasApplication", "title": "1C: Запустить RAS как приложение", "icon": "$(play)" },
+      { "command": "onecClusterManager.stopRasApplication", "title": "1C: Остановить RAS", "icon": "$(stop)" },
+      { "command": "onecClusterManager.installRasService", "title": "1C: Установить службу RAS", "icon": "$(server-environment)" },
+      { "command": "onecClusterManager.startRasService", "title": "1C: Запустить службу RAS", "icon": "$(play)" },
+      { "command": "onecClusterManager.stopRasService", "title": "1C: Остановить службу RAS", "icon": "$(stop)" },
+      { "command": "onecClusterManager.deleteRasService", "title": "1C: Удалить службу RAS", "icon": "$(trash)" }
     ],
     "viewsContainers": {
       "activitybar": [
@@ -51,7 +59,8 @@
     },
     "views": {
       "onecClusterManager": [
-        { "id": "onecClusters", "name": "Кластеры", "icon": "media/cluster.svg", "contextualTitle": "Кластеры 1С" }
+        { "id": "onecClusters", "name": "Кластеры", "icon": "media/cluster.svg", "contextualTitle": "Кластеры 1С" },
+        { "id": "onecRas", "name": "RAS", "icon": "media/cluster.svg", "contextualTitle": "Управление RAS" }
       ]
     },
     "viewsWelcome": [
@@ -63,7 +72,10 @@
     "menus": {
       "view/title": [
         { "command": "onecClusterManager.addConnection", "when": "view == onecClusters", "group": "navigation" },
-        { "command": "onecClusterManager.refresh", "when": "view == onecClusters", "group": "navigation" }
+        { "command": "onecClusterManager.refresh", "when": "view == onecClusters", "group": "navigation" },
+        { "command": "onecClusterManager.startRasApplication", "when": "view == onecRas", "group": "navigation" },
+        { "command": "onecClusterManager.installRasService", "when": "view == onecRas", "group": "navigation" },
+        { "command": "onecClusterManager.rasRefresh", "when": "view == onecRas", "group": "navigation" }
       ],
       "view/item/context": [
         { "command": "onecClusterManager.removeConnection", "when": "view == onecClusters && viewItem == connection", "group": "inline" },
@@ -76,7 +88,13 @@
         { "command": "onecClusterManager.enableSessionLock", "when": "view == onecClusters && viewItem == infobase", "group": "3_locks" },
         { "command": "onecClusterManager.disableSessionLock", "when": "view == onecClusters && viewItem == infobase", "group": "3_locks" },
         { "command": "onecClusterManager.enableScheduledJobsLock", "when": "view == onecClusters && viewItem == infobase", "group": "3_locks" },
-        { "command": "onecClusterManager.disableScheduledJobsLock", "when": "view == onecClusters && viewItem == infobase", "group": "3_locks" }
+        { "command": "onecClusterManager.disableScheduledJobsLock", "when": "view == onecClusters && viewItem == infobase", "group": "3_locks" },
+        { "command": "onecClusterManager.startRasApplication", "when": "view == onecRas && viewItem == rasInstallation", "group": "1_manage" },
+        { "command": "onecClusterManager.installRasService", "when": "view == onecRas && viewItem == rasInstallation", "group": "1_manage" },
+        { "command": "onecClusterManager.stopRasApplication", "when": "view == onecRas && viewItem == rasApplication", "group": "1_manage" },
+        { "command": "onecClusterManager.startRasService", "when": "view == onecRas && viewItem == rasService.stopped", "group": "1_manage" },
+        { "command": "onecClusterManager.stopRasService", "when": "view == onecRas && viewItem == rasService.running", "group": "1_manage" },
+        { "command": "onecClusterManager.deleteRasService", "when": "view == onecRas && viewItem =~ /rasService/", "group": "2_danger" }
       ]
     },
     "configuration": {

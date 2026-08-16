@@ -26,6 +26,14 @@
 - хранение паролей администраторов в VS Code `SecretStorage`;
 - опциональная bearer-аутентификация backend;
 - автоматический запуск встроенного backend при открытии панели расширения.
+- поиск установленных версий `ras.exe` и запуск RAS как управляемого приложения;
+- установка, запуск и остановка RAS как службы Windows.
+
+## Управление RAS
+
+В представлении **RAS** расширение показывает установленные версии платформы, экземпляры RAS, запущенные текущим backend, и зарегистрированные через расширение службы Windows. При запуске указываются порт RAS и адрес агента кластера (`ragent`).
+
+Процесс в режиме приложения принадлежит backend и автоматически завершается вместе с ним. Операции установки и удаления службы выполняются штатным `sc.exe`, требуют запуска VS Code/backend с правами администратора и всегда запрашивают подтверждение. Расширение управляет только процессами и службами, которые создало само.
 
 ## Быстрый старт
 
@@ -70,6 +78,13 @@ GET       /api/connections/{connectionId}/clusters/{clusterId}/servers
 GET       /api/connections/{connectionId}/clusters/{clusterId}/processes
 GET       /api/connections/{connectionId}/clusters/{clusterId}/managers
 GET       /api/connections/{connectionId}/clusters/{clusterId}/services
+GET       /api/ras/installations
+GET/POST  /api/ras/applications
+DELETE    /api/ras/applications/{applicationId}
+GET/POST  /api/ras/services
+POST      /api/ras/services/{serviceName}/start
+POST      /api/ras/services/{serviceName}/stop
+DELETE    /api/ras/services/{serviceName}
 ```
 
 Административные операции выполняются `POST`-маршрутами `terminate`, `interrupt`, `disconnect`, `turn-off` и `settings`. Backend по умолчанию слушает только loopback-интерфейс. Учётные данные кластера и информационной базы не записываются backend на диск.
