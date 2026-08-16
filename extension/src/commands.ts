@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { ApiClient } from "./api";
 import { recordId } from "./presentation";
+import { showInfobaseProperties, showSessions } from "./panels";
 import { SecretRepository } from "./secrets";
 import { ClusterNode, ClusterTreeProvider } from "./tree";
 
@@ -105,13 +106,17 @@ export function registerCommands(
   });
 
   command("onecClusterManager.openDetails", async (node: ClusterNode) => {
-    let record = node.record ?? {};
     if (node.resource === "infobases" && node.connectionId && node.clusterId && node.record) {
-      const response = await api.infobaseDetails(node.connectionId, node.clusterId, recordId("infobases", node.record));
-      record = response.records[0] ?? record;
+      await showInfobaseProperties(context, api, tree, node);
+      return;
     }
+    let record = node.record ?? {};
     const document = await vscode.workspace.openTextDocument({ language: "json", content: `${JSON.stringify(record, null, 2)}\n` });
     await vscode.window.showTextDocument(document, { preview: true });
+  });
+
+  command("onecClusterManager.openSessions", async (node: ClusterNode) => {
+    await showSessions(context, api, tree, node);
   });
 
   const runRecordAction = async (node: ClusterNode, action: string, body: Record<string, unknown>, question: string): Promise<void> => {

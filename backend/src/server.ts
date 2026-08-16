@@ -84,6 +84,21 @@ function secretOption(body: Record<string, unknown>, name: string, maxLength = 2
   return value;
 }
 
+function appendUpdateOption(
+  command: string[],
+  body: Record<string, unknown>,
+  bodyName: string,
+  optionName: string,
+  maxLength = 500,
+): void {
+  if (typeof body[bodyName] !== "string") return;
+  const value = body[bodyName] as string;
+  if (value.length > maxLength || /[\u0000\r\n]/.test(value)) {
+    throw new HttpError(400, `${bodyName} must contain no more than ${maxLength} characters without line breaks`);
+  }
+  command.push(`--${optionName}=${value}`);
+}
+
 function authorize(request: IncomingMessage, token?: string): void {
   if (!token) return;
   if (request.headers.authorization !== `Bearer ${token}`) {
@@ -212,11 +227,23 @@ export function createBackendServer(dependencies: BackendDependencies): Server {
           includeInfobaseCredentials = true;
           if (typeof body.sessionsDeny === "boolean") command.push(`--sessions-deny=${body.sessionsDeny ? "on" : "off"}`);
           if (typeof body.scheduledJobsDeny === "boolean") command.push(`--scheduled-jobs-deny=${body.scheduledJobsDeny ? "on" : "off"}`);
+          if (typeof body.externalSessionManagerRequired === "boolean") command.push(`--external-session-manager-required=${body.externalSessionManagerRequired ? "yes" : "no"}`);
           if (body.licenseDistribution === "allow" || body.licenseDistribution === "deny") command.push(`--license-distribution=${body.licenseDistribution}`);
-          for (const [bodyName, optionName] of [["deniedMessage", "denied-message"], ["permissionCode", "permission-code"]] as const) {
-            const value = body[bodyName];
-            if (typeof value === "string" && value) command.push(`--${optionName}=${value}`);
-          }
+          if (["0", "1", "2", "3"].includes(String(body.securityLevel))) command.push(`--security-level=${body.securityLevel}`);
+          for (const [bodyName, optionName, maxLength] of [
+            ["description", "descr", 500],
+            ["dbServer", "db-server", 255],
+            ["dbName", "db-name", 100],
+            ["dbUser", "db-user", 100],
+            ["deniedFrom", "denied-from", 50],
+            ["deniedTo", "denied-to", 50],
+            ["deniedMessage", "denied-message", 500],
+            ["permissionCode", "permission-code", 255],
+            ["externalSessionManagerConnectionString", "external-session-manager-connection-string", 500],
+            ["securityProfileName", "security-profile-name", 255],
+            ["safeModeSecurityProfileName", "safe-mode-security-profile-name", 255],
+          ] as const) appendUpdateOption(command, body, bodyName, optionName, maxLength);
+          if (typeof body.dbPassword === "string" && body.dbPassword) command.push(`--db-pwd=${secretOption(body, "dbPassword")}`);
           if (command.length === 4) throw new HttpError(400, "At least one infobase setting must be provided");
         }
 
