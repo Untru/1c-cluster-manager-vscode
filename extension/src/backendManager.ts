@@ -21,7 +21,7 @@ export class BackendManager implements vscode.Disposable {
       // Start the bundled backend below when allowed.
     }
 
-    const configuration = vscode.workspace.getConfiguration("pusk");
+    const configuration = vscode.workspace.getConfiguration("onecClusterManager");
     const autoStart = configuration.get<boolean>("backend.autoStart", true);
     const rawUrl = configuration.get<string>("backend.url", "http://127.0.0.1:32145");
     const url = new URL(rawUrl);
@@ -36,10 +36,10 @@ export class BackendManager implements vscode.Disposable {
       silent: true,
       env: {
         ...process.env,
-        PUSK_HOST: url.hostname,
-        PUSK_PORT: url.port || "32145",
-        PUSK_CONFIG_FILE: path.join(this.context.globalStorageUri.fsPath, "connections.json"),
-        PUSK_API_TOKEN: await this.secrets.getBackendToken(),
+        ONEC_CLUSTER_MANAGER_HOST: url.hostname,
+        ONEC_CLUSTER_MANAGER_PORT: url.port || "32145",
+        ONEC_CLUSTER_MANAGER_CONFIG_FILE: path.join(this.context.globalStorageUri.fsPath, "connections.json"),
+        ONEC_CLUSTER_MANAGER_API_TOKEN: await this.secrets.getBackendToken(),
       },
     });
     this.process.stderr?.on("data", (chunk: Buffer) => console.error(`[1C backend] ${chunk.toString("utf8").trimEnd()}`));

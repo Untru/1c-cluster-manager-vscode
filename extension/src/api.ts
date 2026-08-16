@@ -70,16 +70,16 @@ export class ApiClient {
       credentials?: { cluster: Credentials; infobase: Credentials };
     } = {},
   ): Promise<T> {
-    const baseUrl = vscode.workspace.getConfiguration("pusk").get<string>("backend.url", "http://127.0.0.1:32145").replace(/\/$/, "");
+    const baseUrl = vscode.workspace.getConfiguration("onecClusterManager").get<string>("backend.url", "http://127.0.0.1:32145").replace(/\/$/, "");
     const headers: Record<string, string> = { accept: "application/json" };
     const token = await this.secrets.getBackendToken();
     if (token) headers.authorization = `Bearer ${token}`;
     if (options.body !== undefined) headers["content-type"] = "application/json";
     const encoded = (value: string): string => Buffer.from(value, "utf8").toString("base64");
-    if (options.credentials?.cluster.user) headers["x-pusk-cluster-user-b64"] = encoded(options.credentials.cluster.user);
-    if (options.credentials?.cluster.password) headers["x-pusk-cluster-password-b64"] = encoded(options.credentials.cluster.password);
-    if (options.credentials?.infobase.user) headers["x-pusk-infobase-user-b64"] = encoded(options.credentials.infobase.user);
-    if (options.credentials?.infobase.password) headers["x-pusk-infobase-password-b64"] = encoded(options.credentials.infobase.password);
+    if (options.credentials?.cluster.user) headers["x-onec-cluster-manager-cluster-user-b64"] = encoded(options.credentials.cluster.user);
+    if (options.credentials?.cluster.password) headers["x-onec-cluster-manager-cluster-password-b64"] = encoded(options.credentials.cluster.password);
+    if (options.credentials?.infobase.user) headers["x-onec-cluster-manager-infobase-user-b64"] = encoded(options.credentials.infobase.user);
+    if (options.credentials?.infobase.password) headers["x-onec-cluster-manager-infobase-password-b64"] = encoded(options.credentials.infobase.password);
 
     const response = await fetch(`${baseUrl}${path}`, {
       method: options.method ?? "GET",

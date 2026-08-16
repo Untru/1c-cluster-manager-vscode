@@ -1,5 +1,5 @@
 {
-  "name": "pusk-vscode",
+  "name": "onec-cluster-manager-vscode",
   "version": "0.1.0",
   "private": true,
   "workspaces": [
@@ -7,8 +7,8 @@
     "extension"
   ],
   "scripts": {
-    "build": "npm run build --workspace @pusk/backend && npm run build --workspace pusk-cluster-manager",
-    "test": "npm run test --workspace @pusk/backend && npm run test --workspace pusk-cluster-manager",
+    "build": "npm run build --workspace @onec-cluster-manager/backend && npm run build --workspace onec-cluster-manager",
+    "test": "npm run test --workspace @onec-cluster-manager/backend && npm run test --workspace onec-cluster-manager",
     "check": "npm run build && npm test"
   },
   "devDependencies": {

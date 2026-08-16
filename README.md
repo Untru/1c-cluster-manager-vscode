@@ -1,6 +1,6 @@
 # 1C Cluster Manager for VS Code
 
-Самостоятельное решение для администрирования кластеров 1С:Предприятия из VS Code. Оно работает через штатные `RAS` и `rac` и **не использует backend или код «ПУСК»**.
+Самостоятельное решение для администрирования кластеров 1С:Предприятия из VS Code через штатные `RAS` и `rac`.
 
 Проект состоит из двух частей:
 
@@ -26,25 +26,25 @@
 ```powershell
 npm install
 npm run check
-npm run package --workspace pusk-cluster-manager
+npm run package --workspace onec-cluster-manager
 ```
 
-Установите созданный файл `extension/pusk-cluster-manager-0.1.0.vsix` командой **Extensions: Install from VSIX...**. Затем откройте раздел «Кластеры 1С» на панели активности и нажмите «Добавить подключение».
+Установите созданный файл `extension/onec-cluster-manager-0.1.0.vsix` командой **Extensions: Install from VSIX...**. Затем откройте раздел «Кластеры 1С» на панели активности и нажмите «Добавить подключение».
 
-Для локальных установок расширение само запускает упакованный backend на `127.0.0.1:32145`. Адрес и автозапуск настраиваются параметрами `pusk.backend.url` и `pusk.backend.autoStart`.
+Для локальных установок расширение само запускает упакованный backend на `127.0.0.1:32145`. Адрес и автозапуск настраиваются параметрами `onecClusterManager.backend.url` и `onecClusterManager.backend.autoStart`.
 
 ## Самостоятельный запуск backend
 
 ```powershell
-$env:PUSK_HOST = "127.0.0.1"
-$env:PUSK_PORT = "32145"
-$env:PUSK_CONFIG_FILE = "C:\ProgramData\pusk-vscode\connections.json"
-$env:PUSK_API_TOKEN = "replace-with-a-long-random-value" # необязательно для loopback
-npm run build --workspace @pusk/backend
-npm start --workspace @pusk/backend
+$env:ONEC_CLUSTER_MANAGER_HOST = "127.0.0.1"
+$env:ONEC_CLUSTER_MANAGER_PORT = "32145"
+$env:ONEC_CLUSTER_MANAGER_CONFIG_FILE = "C:\ProgramData\onec-cluster-manager-vscode\connections.json"
+$env:ONEC_CLUSTER_MANAGER_API_TOKEN = "replace-with-a-long-random-value" # необязательно для loopback
+npm run build --workspace @onec-cluster-manager/backend
+npm start --workspace @onec-cluster-manager/backend
 ```
 
-Если задан `PUSK_API_TOKEN`, сохраните то же значение командой **1C: Указать токен backend**.
+Если задан `ONEC_CLUSTER_MANAGER_API_TOKEN`, сохраните то же значение командой **1C: Указать токен backend**.
 
 ## API
 
@@ -69,4 +69,3 @@ GET       /api/connections/{connectionId}/clusters/{clusterId}/services
 ## Разработка
 
 Откройте корень репозитория в VS Code и запустите конфигурацию **Run 1C Cluster Manager Extension**. Перед запуском задача сборки скомпилирует backend и скопирует его в пакет расширения.
-

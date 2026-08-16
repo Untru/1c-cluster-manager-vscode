@@ -89,7 +89,7 @@ export class ClusterTreeProvider implements vscode.TreeDataProvider<ClusterNode>
         node.contextValue = RECORD_CONTEXT[element.resource!];
         node.iconPath = new vscode.ThemeIcon(RESOURCE_ICONS[element.resource!]);
         node.tooltip = this.tooltip(record);
-        node.command = { command: "pusk.openDetails", title: "Показать подробности", arguments: [node] };
+        node.command = { command: "onecClusterManager.openDetails", title: "Показать подробности", arguments: [node] };
         return node;
       });
     }

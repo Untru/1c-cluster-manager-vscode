@@ -3,6 +3,6 @@ out/
 dist/
 extension/backend/
 *.vsix
-.pusk/
+.onec-cluster-manager/
 coverage/
 *.log

@@ -11,7 +11,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const backend = new BackendManager(context, api, secrets);
   const tree = new ClusterTreeProvider(api);
 
-  context.subscriptions.push(backend, vscode.window.registerTreeDataProvider("puskClusters", tree));
+  context.subscriptions.push(backend, vscode.window.registerTreeDataProvider("onecClusters", tree));
   registerCommands(context, api, secrets, tree);
 
   try {
@@ -19,7 +19,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     tree.refresh();
   } catch (error) {
     const action = await vscode.window.showErrorMessage(`1C Cluster Manager: ${(error as Error).message}`, "Настройки");
-    if (action === "Настройки") await vscode.commands.executeCommand("workbench.action.openSettings", "pusk.backend");
+    if (action === "Настройки") await vscode.commands.executeCommand("workbench.action.openSettings", "onecClusterManager.backend");
   }
 }
 

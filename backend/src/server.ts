@@ -55,10 +55,10 @@ function credentialsFrom(request: IncomingMessage): RequestCredentials {
     try { return Buffer.from(value, "base64").toString("utf8"); } catch { throw new HttpError(400, `Invalid ${name} header`); }
   };
   return {
-    clusterUser: decoded("x-pusk-cluster-user-b64"),
-    clusterPassword: decoded("x-pusk-cluster-password-b64"),
-    infobaseUser: decoded("x-pusk-infobase-user-b64"),
-    infobasePassword: decoded("x-pusk-infobase-password-b64"),
+    clusterUser: decoded("x-onec-cluster-manager-cluster-user-b64"),
+    clusterPassword: decoded("x-onec-cluster-manager-cluster-password-b64"),
+    infobaseUser: decoded("x-onec-cluster-manager-infobase-user-b64"),
+    infobasePassword: decoded("x-onec-cluster-manager-infobase-password-b64"),
   };
 }
 
